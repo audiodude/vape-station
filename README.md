@@ -35,6 +35,10 @@ vocal formants, inharmonic bell spectra, and raw noise-bitten textures.
 
 ## Get it
 
+**Play it in your browser first**: https://vapestation.audiodude.xyz — the
+full synth (same DSP, ported to an AudioWorklet) running entirely
+client-side. Works with mouse, computer keys, or a MIDI keyboard.
+
 Download from [Releases](../../releases/latest): a zip per platform, or the
 `all-platforms` tarball — one cross-platform `.vst3` bundle that works on
 all three OSes. Bleeding-edge builds are on the latest
@@ -151,6 +155,17 @@ demo) and `ui-snapshot.png` (an editor screenshot) to `outputDir`. Exit code
 is the number of failed checks.
 
 The plugin passes `pluginval --strictness-level 10`.
+
+## Web version
+
+`webapp/` is a static, no-build port of the synth to the Web Audio API: the
+DSP engine (tables, grain voices, filter, envelopes, LFO modes, mod matrix)
+lives in `webapp/js/engine.js` and runs in an AudioWorklet; the UI mirrors
+the plugin. `node webapp/test/render-test.mjs` runs the RenderTest checks
+against the JS engine offline. `webapp/serve.sh` serves it locally
+(AudioWorklet modules need http, not file://). CI deploys it to Cloudflare
+Pages (https://vapestation.audiodude.xyz) via the `deploy-web` job whenever
+a release is published.
 
 ## Layout
 
