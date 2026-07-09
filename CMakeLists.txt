@@ -16,6 +16,9 @@ endif()
 FetchContent_Declare(JUCE URL "${VAPE_JUCE_URL}")
 FetchContent_MakeAvailable(JUCE)
 
+# Copy the built plugin into the user's VST3 dir. CI turns this off.
+option(VAPE_COPY_PLUGIN "Copy the plugin to the user plugin dir after build" ON)
+
 set(VAPE_SOURCES
     Source/GrainTables.cpp
     Source/GrainVoice.cpp
@@ -37,7 +40,7 @@ juce_add_plugin(VapeStation
     NEEDS_MIDI_INPUT TRUE
     NEEDS_MIDI_OUTPUT FALSE
     IS_MIDI_EFFECT FALSE
-    COPY_PLUGIN_AFTER_BUILD TRUE
+    COPY_PLUGIN_AFTER_BUILD ${VAPE_COPY_PLUGIN}
     VST3_CATEGORIES Instrument Synth
 )
 

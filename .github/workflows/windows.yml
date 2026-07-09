@@ -1,0 +1,35 @@
+name: windows
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure
+        run: cmake -B build -DVAPE_COPY_PLUGIN=OFF
+
+      - name: Build
+        run: cmake --build build --config Release --target VapeStation_VST3 RenderTest --parallel
+
+      # Upload before testing so the binary survives a failing check.
+      - name: Upload VST3
+        uses: actions/upload-artifact@v4
+        with:
+          name: VapeStation-windows-x64-vst3
+          path: build/VapeStation_artefacts/Release/VST3/VapeStation.vst3
+
+      - name: RenderTest
+        run: ./build/RenderTest_artefacts/Release/RenderTest.exe rt-out
+
+      - name: Upload test output
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: rendertest-output
+          path: rt-out
