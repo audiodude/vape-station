@@ -151,3 +151,16 @@ jobs:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: npx --yes wrangler pages deploy webapp --project-name=vapestation --branch=main
+
+      # The custom domain caches assets for 4h; purge so releases are
+      # visible immediately. (Verified: purge_everything does evict the
+      # Pages-layer objects on this zone — next fetch is a MISS.)
+      - name: Purge zone cache
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: |
+          curl -sf -X POST \
+            -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
+            -H "Content-Type: application/json" \
+            "https://api.cloudflare.com/client/v4/zones/${{ secrets.CLOUDFLARE_ZONE_ID }}/purge_cache" \
+            -d '{"purge_everything":true}' | grep -q '"success": *true'
