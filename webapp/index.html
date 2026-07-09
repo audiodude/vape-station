@@ -96,6 +96,20 @@
   .footer { text-align: right; font-size: 11px; color: #34d399; }
   .footer a { color: #34d399; text-decoration: none; }
   .footer a:hover { text-decoration: underline; }
+
+  /* Touch: keep drags on knobs/sliders/keys from scrolling the page. */
+  .knobcell svg, .hslider, .chip, .wkey, .bkey, #viz { touch-action: none; }
+
+  /* Sorta-kinda phone layout: stack the rows, one matrix column, scrollable keyboard. */
+  @media (max-width: 920px) {
+    .app { padding: 12px 10px; }
+    .header-band, .row { flex-wrap: wrap; }
+    .row > .panel { width: 100% !important; flex: 1 1 100% !important; }
+    #matrixrows { grid-template-columns: 1fr; max-height: 168px; }
+    #kbscroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+    #keyboard { min-width: 940px; }
+    .footer { text-align: center; }
+  }
 </style>
 </head>
 <body>
@@ -103,7 +117,7 @@
 <div class="app">
 
   <!-- HEADER -->
-  <div class="panel" style="padding: 14px 20px; display: flex; align-items: center; gap: 20px;">
+  <div class="panel header-band" style="padding: 14px 20px; display: flex; align-items: center; gap: 20px;">
     <div style="display: flex; flex-direction: column; gap: 2px;">
       <div style="font-size: 22px; font-weight: 900; letter-spacing: 0.02em; line-height: 1;">
         <span style="color: #4aa5ff;">VAPE</span><span style="color: #fff;"> STATION</span>
@@ -122,7 +136,7 @@
   </div>
 
   <!-- ROW 1 -->
-  <div style="display: flex; gap: 12px; align-items: stretch;">
+  <div class="row" style="display: flex; gap: 12px; align-items: stretch;">
     <div class="panel" style="width: 360px; flex-shrink: 0; padding: 14px 16px; display: flex; flex-direction: column; gap: 12px;">
       <div class="title">GRAINTABLE</div>
       <div class="well" style="flex: 1; padding: 10px; display: flex; align-items: center;">
@@ -146,7 +160,7 @@
   </div>
 
   <!-- ROW 2 -->
-  <div id="row2" style="display: flex; gap: 12px; align-items: stretch;"></div>
+  <div id="row2" class="row" style="display: flex; gap: 12px; align-items: stretch;"></div>
 
   <!-- MATRIX -->
   <div class="panel" style="position: relative; padding: 14px 16px; display: flex; flex-direction: column; gap: 12px;">
@@ -162,7 +176,7 @@
   </div>
 
   <!-- KEYBOARD -->
-  <div class="well" id="keyboard"></div>
+  <div id="kbscroll"><div class="well" id="keyboard"></div></div>
 
   <div class="footer">
     Made with &#127925; by <a href="https://travisbriggs.com" target="_blank" rel="noopener">Travis Briggs</a>

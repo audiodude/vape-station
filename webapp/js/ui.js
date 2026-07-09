@@ -668,7 +668,12 @@ if (navigator.requestMIDIAccess) {
 let latestNorms = null;
 async function startAudio() {
   if (audio) return;
+  // iOS: ask for the 'playback' session so the hardware silent switch
+  // doesn't mute Web Audio.
+  try { if (navigator.audioSession) navigator.audioSession.type = 'playback'; } catch { /* optional */ }
   const ctx = new AudioContext({ latencyHint: 'interactive' });
+  // iOS Safari can leave a gesture-created context suspended.
+  if (ctx.state === 'suspended') await ctx.resume();
   await ctx.audioWorklet.addModule(new URL('./worklet.js', import.meta.url));
   const node = new AudioWorkletNode(ctx, 'vape-station', { outputChannelCount: [2] });
   node.connect(ctx.destination);
@@ -678,6 +683,12 @@ async function startAudio() {
   document.getElementById('startoverlay').remove();
 }
 document.getElementById('startoverlay').addEventListener('pointerdown', startAudio, { once: true });
+
+// Safety net: if the context gets suspended (tab switch, iOS interruptions),
+// any touch revives it.
+window.addEventListener('pointerdown', () => {
+  if (audio && audio.ctx.state === 'suspended') audio.ctx.resume();
+}, { capture: true });
 
 let lastVizPos = -1;
 function tick() {
