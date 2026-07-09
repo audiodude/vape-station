@@ -152,6 +152,21 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: npx --yes wrangler pages deploy webapp --project-name=vapestation --branch=main
 
+      # Purging while the production alias is still flipping just re-caches
+      # the old deployment. Block until origin serves the new version stamp
+      # (unique query string = unique cache key = always fetched from origin).
+      - name: Wait for deployment to go live
+        run: |
+          for i in $(seq 1 40); do
+            if curl -sf --max-time 10 "https://vapestation.audiodude.xyz/js/version.js?live=$GITHUB_RUN_ID-$i" | grep -q "$GITHUB_REF_NAME"; then
+              echo "live after $i checks"
+              exit 0
+            fi
+            sleep 5
+          done
+          echo "deployment did not go live within 200s" >&2
+          exit 1
+
       # The custom domain caches assets for 4h; purge so releases are
       # visible immediately. purge_everything alone has been observed to
       # leave Pages-layer objects revalidating stale (bogus 304s), so also
