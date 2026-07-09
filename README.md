@@ -1,58 +1,66 @@
 # VapeStation
 
-A graintable synthesizer VST3 (prototype). Classic pitch-synchronous granular
-playback over morphing wavetable frame-stacks, with the headline feature being
-**Serum-style modulation**: every continuous parameter can be modulated by any
-envelope, LFO, or performance source via drag-and-drop.
+**A free, cross-platform "graintable" synthesizer.** Wavetable morphing meets
+granular texture. Every knob on the panel can be modulated by dragging
+an envelope or LFO straight onto it.
 
-Built with JUCE 8 (fetched automatically by CMake). Formats: **VST3** and
-**Standalone**, tested on Linux.
+VapeStation plays clouds of pitch-tracked grains from morphing wavetable
+frame-stacks. Sweep **Position** to morph through a table's 64 frames like a
+wavetable synth. Use **Spray**, **Pitch Rnd**, and **Density** and the
+same patch dissolves into granular haze, shimmer, or grit. Five built-in
+tables (**Morph, Sweep, Vox, Bells, Grit**) cover smooth analog-ish morphs,
+vocal formants, inharmonic bell spectra, and raw noise-bitten textures.
 
-## Build
+## Why you'll like it
 
-```
-cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
-cmake --build build --target VapeStation_VST3 VapeStation_Standalone -j$(nproc)
-```
+- **Drag-and-drop modulation, everywhere.** Grab a coloured source chip
+  (three envelopes, two LFOs, velocity, mod wheel, or keytrack) and
+  drop it on any knob. All 26 continuous parameters are targets, including
+  envelope times and the LFO rates themselves.
+- **See your modulation.** Modulated knobs grow coloured halo rings showing
+  each route's span, with a white dot riding the live modulated value. A
+  matrix panel lists every route with a bipolar depth slider.
+- **Play it like an instrument.** 10 voices, sustain pedal, pitch bend, and
+  per-LFO **Retrig / First Note / Global** modes so modulation can lock to
+  every note, to your phrasing, or run free across the whole performance.
+- **Knobs that feel right.** Every control snaps to musically spaced steps
+  with real units on the readout ("2.4 Hz", "250 ms"), envelope knobs are
+  calibrated to clock positions (250 ms at 9 o'clock, 1 s at noon, 4 s at
+  3 o'clock), and automation stays perfectly smooth underneath.
+- **A safe playground.** One INIT button back to a known-good default patch;
+  the default patch already has a moving route so you hear the point
+  immediately.
+- **Free, open source, everywhere.** Linux, Windows, and macOS (universal),
+  as VST3 and standalone. Passes `pluginval --strictness-level 10`.
 
-The first configure downloads JUCE 8.0.14 (set the `JUCE_TARBALL` env var to a
-pre-downloaded tarball path to skip the network fetch). The VST3 is
-auto-copied to the platform VST3 dir (`~/.vst3` on Linux,
-`~/Library/Audio/Plug-Ins/VST3` on macOS) after building; the standalone app
-lands at `build/VapeStation_artefacts/Release/Standalone/VapeStation`.
+## Get it
 
-On macOS, `./build_and_copy_mac.sh` builds a universal (arm64 + x86_64)
-release and copies the VST3 into `~/Library/Audio/Plug-Ins/VST3`, replacing
-any previous copy.
+Grab a build from the latest [`build` workflow run](../../actions/workflows/build.yml)
+(GitHub login required for artifact downloads): per-platform artifacts, or
+`VapeStation-all-platforms-vst3` — one cross-platform `.vst3` bundle that
+works on all three OSes (tarred so the macOS binary keeps its exec bit).
+Or build from source (below).
 
-CI builds all three platforms: the `build` GitHub Actions workflow
-(`.github/workflows/build.yml`) builds the VST3 and runs RenderTest on
-Linux (x64), Windows (x64), and macOS (universal) on every push to `main`
-(or manually via workflow dispatch); download the
-`VapeStation-<platform>-vst3` artifact from the run, or
-`VapeStation-all-platforms-vst3` — a single cross-platform `.vst3` bundle
-(tarred to preserve the macOS binary's exec bit) that works on all three
-OSes per the VST3 bundle spec. Pass
-`-DVAPE_COPY_PLUGIN=OFF` to CMake to skip the local install-after-build
-copy step (CI does this).
+Install by dropping `VapeStation.vst3` into your VST3 folder:
 
-## Verify
+- **Linux** — `~/.vst3/`
+- **Windows** — `C:\Program Files\Common Files\VST3\`
+- **macOS** — `~/Library/Audio/Plug-Ins/VST3/`; builds are unsigned, so
+  clear quarantine after unpacking:
+  `xattr -dr com.apple.quarantine ~/Library/Audio/Plug-Ins/VST3/VapeStation.vst3`
 
-```
-cmake --build build --target RenderTest -j$(nproc)
-./build/RenderTest_artefacts/Release/RenderTest [outputDir]
-```
+## Quick start
 
-RenderTest renders MIDI offline through the real processor and checks:
-silence without notes, audio + finite output + clean release with notes,
-deterministic rendering, that a mod route measurably changes the output, and
-state save/load round-tripping. It also writes `vape-demo.wav` (a short
-listening demo) and `ui-snapshot.png` (an editor screenshot) to `outputDir`.
-Exit code is the number of failed checks.
+1. Play a note — the default patch already has LFO1 slowly scanning table
+   Position.
+2. Drag the **LFO2** chip onto **Cutoff**. A green ring appears; the filter
+   starts breathing.
+3. Drag horizontally on the waveform display to set Position by hand.
+4. Open **Spray** and **Pitch Rnd** a little; raise **Size** for washes,
+   lower it for buzz.
+5. Too far? Hit **INIT** and start clean.
 
-The plugin passes `pluginval --strictness-level 10`.
-
-## The synth
+## VapeStation: Detailed specs
 
 **Graintable engine** — five built-in tables (Morph, Sweep, Vox, Bells, Grit),
 each 64 single-cycle frames generated procedurally at startup and band-limited
@@ -74,10 +82,11 @@ increments for times/rates/cutoff, 0.5 ms floor on envelope times, whole
 semitones/cents for Coarse/Fine, 1% for 0-1 params); host automation and
 modulation stay continuous. Envelope times run 0-10 s on a clock-calibrated
 taper: fully CCW = 0 (releases bottom out at 5 ms to stay click-free),
-9 o'clock = 250 ms, noon = 1 s, 3 o'clock = 4 s. The INIT button in the
-header resets all parameters and the mod matrix to the default patch.
+9 o'clock = 250 ms, noon = 1 s, 3 o'clock = 4 s. LFO rates are linear
+0.1-5 Hz. The INIT button in the header resets all parameters and the mod
+matrix to the default patch.
 
-**Modulation** — the point of the prototype. Sources: ENV1 (amp), ENV2, ENV3,
+**Modulation** — the point of the synth. Sources: ENV1 (amp), ENV2, ENV3,
 LFO1, LFO2, velocity, mod wheel, keytrack. Each LFO has a mode selector:
 **Retrig** (per-voice, phase restarts every note-on and the value follows the
 note), **First Note** (one shared LFO that restarts on a note-on when no keys
@@ -100,6 +109,49 @@ Retrig mode):
 The graintable display doubles as a control: drag horizontally to set
 Position. Routes persist in the plugin state.
 
+---
+
+## Building from source
+
+```
+cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
+cmake --build build --target VapeStation_VST3 VapeStation_Standalone -j$(nproc)
+```
+
+The first configure downloads JUCE 8.0.14 (set the `JUCE_TARBALL` env var to a
+pre-downloaded tarball path to skip the network fetch). The VST3 is
+auto-copied to the platform VST3 dir (`~/.vst3` on Linux,
+`~/Library/Audio/Plug-Ins/VST3` on macOS) after building; the standalone app
+lands at `build/VapeStation_artefacts/Release/Standalone/VapeStation`.
+
+On macOS, `./build_and_copy_mac.sh` builds a universal (arm64 + x86_64)
+release and copies the VST3 into `~/Library/Audio/Plug-Ins/VST3`, replacing
+any previous copy.
+
+CI builds all three platforms: the `build` GitHub Actions workflow
+(`.github/workflows/build.yml`) builds the VST3 and runs RenderTest on
+Linux (x64), Windows (x64), and macOS (universal) on every push to `main`
+(or manually via workflow dispatch), then merges the three into the
+cross-platform bundle artifact. Pass `-DVAPE_COPY_PLUGIN=OFF` to CMake to
+skip the local install-after-build copy step (CI does this).
+
+## Verify
+
+```
+cmake --build build --target RenderTest -j$(nproc)
+./build/RenderTest_artefacts/Release/RenderTest [outputDir]
+```
+
+RenderTest renders MIDI offline through the real processor and checks:
+silence without notes, audio + finite output + clean release with notes,
+deterministic rendering, that a mod route measurably changes the output,
+LFO mode behaviour, parameter taper/step calibration, INIT, and state
+save/load round-tripping. It also writes `vape-demo.wav` (a short listening
+demo) and `ui-snapshot.png` (an editor screenshot) to `outputDir`. Exit code
+is the number of failed checks.
+
+The plugin passes `pluginval --strictness-level 10`.
+
 ## Layout
 
 - `Source/Params.h` — parameter/destination definitions (single source of truth)
@@ -114,6 +166,8 @@ Position. Routes persist in the plugin state.
 
 ## Known rough edges (it's a prototype)
 
-- No tempo sync on LFOs; no unison; mip switching between notes can step timbre
-  at extreme transpose; matrix depths aren't host-automatable parameters;
-  fixed-size UI.
+- No tempo sync on LFOs
+- No unison
+- Mip switching between notes can step timbre at extreme transpose
+- Matrix depths aren't host-automatable parameters
+- Fixed-size UI
