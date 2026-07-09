@@ -721,6 +721,10 @@ async function startAudio() {
 // Not {once:true} so a failed startup can be retried by tapping again.
 document.getElementById('startoverlay').addEventListener('click', startAudio);
 
+// ?nosplash: hide the start overlay without starting audio (screenshots).
+if (new URLSearchParams(location.search).has('nosplash'))
+  document.getElementById('startoverlay').remove();
+
 // Safety net: if the context gets suspended (tab switch, phone
 // interruptions), the next completed tap revives it.
 window.addEventListener('pointerup', () => {
