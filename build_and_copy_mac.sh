@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Build a universal (arm64 + x86_64) release and install the VST3 locally.
+# Build a universal (arm64 + x86_64) release and copy the VST3 into the
+# user's plugin folder.
 set -euo pipefail
 cd "$(dirname "$0")"
 
@@ -12,4 +13,4 @@ DEST="$HOME/Library/Audio/Plug-Ins/VST3"
 mkdir -p "$DEST"
 rm -rf "$DEST/VapeStation.vst3"
 cp -R "$SRC" "$DEST/"
-echo "Deployed $SRC -> $DEST/VapeStation.vst3"
+echo "Copied $SRC -> $DEST/VapeStation.vst3"

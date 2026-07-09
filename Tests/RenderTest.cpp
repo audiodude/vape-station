@@ -289,9 +289,78 @@ int main (int argc, char** argv)
                        && std::abs (snapKnobValue (dCutoff, 1234.0f) - 1200.0f) < 1.0e-2f
                        && std::abs (snapKnobValue (dPosition, 0.6789f) - 0.68f) < 1.0e-4f;
         check (grid, "knob step grid snaps to nice values");
+
+        // LFO rate: linear 0.1-5 Hz
+        auto* rate = p.apvts.getParameter ("lfo1Rate");
+        const bool lin = std::abs (rate->convertFrom0to1 (0.0f) - 0.1f)  < 1.0e-4f
+                      && std::abs (rate->convertFrom0to1 (0.5f) - 2.55f) < 1.0e-3f
+                      && std::abs (rate->convertFrom0to1 (1.0f) - 5.0f)  < 1.0e-4f;
+        check (lin, "lfo rate is linear 0.1-5 Hz");
+
+        // INIT: params back to defaults, matrix back to the single default route
+        setParamNatural (p, "position", 0.9f);
+        setParamNatural (p, "cutoff", 500.0f);
+        p.addModRoute (sEnv2, dRes, 0.5f);
+        p.compileMatrixNow();
+        p.initPatch();
+        const auto* m = p.currentMatrix();
+        const bool init = std::abs (p.rawParam (dPosition)->load() - 0.15f)   < 1.0e-4f
+                       && std::abs (p.rawParam (dCutoff)->load()   - 14000.0f) < 1.0f
+                       && m->totalRoutes == 1
+                       && m->routes[dPosition].size() == 1
+                       && m->routes[dPosition][0].src == sLfo1;
+        check (init, "INIT restores the default patch");
     }
 
-    // T7: demo render for listening
+    // T7: LFO modes. Two identical non-overlapping notes (randomness zeroed):
+    // in Retrig / First Note the second note restarts the LFO so both notes
+    // render (nearly) alike; in Global the free-running LFO is mid-phase at
+    // the second note, so the notes differ.
+    {
+        auto renderTwoNotes = [] (int mode)
+        {
+            VapeProcessor p;
+            setParamNatural (p, "table", 1.0f);   // Sweep: position changes = strong spectral change
+            setParamNatural (p, "spray", 0.0f);
+            setParamNatural (p, "spread", 0.0f);
+            setParamNatural (p, "lfo1Rate", 0.7f); // non-integer cycles after 1 s
+            setParamNatural (p, "lfo1Mode", (float) mode);
+            clearMatrix (p);
+            p.addModRoute (sLfo1, dPosition, 0.9f);
+            p.compileMatrixNow();
+
+            Score s;
+            s.dur = 2.0;
+            s.note (0.0, 48, 0.35);
+            s.note (1.0, 48, 0.35);
+            return renderScore (p, s);
+        };
+        auto segRelDiff = [] (const juce::AudioBuffer<float>& b, double tA, double tB, double len)
+        {
+            const int iA = (int) (tA * kSR), iB = (int) (tB * kSR), n = (int) (len * kSR);
+            double diff = 0.0, ref = 0.0;
+            for (int ch = 0; ch < 2; ++ch)
+            {
+                const float* d = b.getReadPointer (ch);
+                for (int i = 0; i < n; ++i)
+                {
+                    const double e = (double) d[iA + i] - d[iB + i];
+                    diff += e * e;
+                    ref += (double) d[iA + i] * d[iA + i];
+                }
+            }
+            return ref > 0.0 ? std::sqrt (diff / ref) : 0.0;
+        };
+
+        const double dRetrig = segRelDiff (renderTwoNotes (lfoModeRetrig),    0.0, 1.0, 0.4);
+        const double dFirst  = segRelDiff (renderTwoNotes (lfoModeFirstNote), 0.0, 1.0, 0.4);
+        const double dGlobal = segRelDiff (renderTwoNotes (lfoModeGlobal),    0.0, 1.0, 0.4);
+        check (dRetrig < 0.05, "retrig LFO repeats per note",      "relDiff=" + juce::String (dRetrig, 4));
+        check (dFirst  < 0.05, "first-note LFO resets on new note", "relDiff=" + juce::String (dFirst, 4));
+        check (dGlobal > 0.2,  "global LFO free-runs across notes", "relDiff=" + juce::String (dGlobal, 4));
+    }
+
+    // T8: demo render for listening
     {
         VapeProcessor p; // default patch, including the default LFO1->position route
         Score s;
@@ -325,7 +394,7 @@ int main (int argc, char** argv)
         check (ok, "demo wav written", f.getFullPathName());
     }
 
-    // T8: editor snapshot (needs a display)
+    // T9: editor snapshot (needs a display)
     if (juce::SystemStats::getEnvironmentVariable ("DISPLAY", {}).isNotEmpty())
     {
         VapeProcessor p;

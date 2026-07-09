@@ -38,7 +38,7 @@ public:
     void renderNextBlock (juce::AudioBuffer<float>& outputBuffer, int startSample, int numSamples) override;
 
 private:
-    static constexpr int subBlock  = 32;
+    static constexpr int subBlock  = controlBlockSamples;
     static constexpr int maxGrains = 24;
 
     struct Grain
@@ -53,7 +53,7 @@ private:
         int mip = 0;
     };
 
-    void updateControls (const GrainTable& tbl, const CompiledMatrix* mat, int n);
+    void updateControls (const GrainTable& tbl, const CompiledMatrix* mat, int n, int blockOffset);
     void spawnGrain (const GrainTable& tbl);
 
     VapeProcessor& proc;

@@ -19,6 +19,8 @@ VapeProcessor::VapeProcessor()
     filterTypeRaw = apvts.getRawParameterValue ("filterType");
     lfo1ShapeRaw  = apvts.getRawParameterValue ("lfo1Shape");
     lfo2ShapeRaw  = apvts.getRawParameterValue ("lfo2Shape");
+    lfo1ModeRaw   = apvts.getRawParameterValue ("lfo1Mode");
+    lfo2ModeRaw   = apvts.getRawParameterValue ("lfo2Mode");
 
     grainTables(); // build tables up front
 
@@ -106,6 +108,23 @@ void VapeProcessor::addModRoute (int src, int dest, float depth)
     mm.appendChild (row, nullptr);
 }
 
+void VapeProcessor::initPatch()
+{
+    for (auto* p : getParameters())
+        if (auto* rp = dynamic_cast<juce::RangedAudioParameter*> (p))
+        {
+            rp->beginChangeGesture();
+            rp->setValueNotifyingHost (rp->getDefaultValue());
+            rp->endChangeGesture();
+        }
+
+    auto mm = matrixNode();
+    if (mm.isValid())
+        apvts.state.removeChild (mm, nullptr);
+    ensureMatrixNode();
+    compileMatrixNow();
+}
+
 int VapeProcessor::tableIndex() const
 {
     return juce::jlimit (0, (int) grainTables().size() - 1,
@@ -124,6 +143,15 @@ void VapeProcessor::prepareToPlay (double sampleRate, int samplesPerBlock)
     synth.setCurrentPlaybackSampleRate (sampleRate);
     for (auto* v : voices)
         v->prepare (sampleRate, samplesPerBlock);
+
+    srHz = sampleRate;
+    heldKeys = 0;
+    const auto slots = (size_t) ((samplesPerBlock + controlBlockSamples - 1) / controlBlockSamples + 1);
+    for (int i = 0; i < 2; ++i)
+    {
+        sharedVals[(size_t) i].assign (slots, 0.0f);
+        sharedLfos[(size_t) i].reset (0x5EED + i); // deterministic offline renders
+    }
 }
 
 bool VapeProcessor::isBusesLayoutSupported (const BusesLayout& layouts) const
@@ -144,6 +172,39 @@ void VapeProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::MidiBu
         const auto msg = metadata.getMessage();
         if (msg.isController() && msg.getControllerNumber() == 1)
             wheel.store ((float) msg.getControllerValue() / 127.0f, std::memory_order_relaxed);
+    }
+
+    // Advance the shared (First Note / Global) LFOs one control tick at a
+    // time, applying note on/offs as they fall so a First Note reset lands on
+    // the right tick. Voices read these values during renderNextBlock below.
+    {
+        const int numSlots = juce::jmin ((int) sharedVals[0].size(),
+                                         (buffer.getNumSamples() + controlBlockSamples - 1) / controlBlockSamples);
+        auto ev = midi.begin();
+        for (int s = 0; s < numSlots; ++s)
+        {
+            while (ev != midi.end() && (*ev).samplePosition < (s + 1) * controlBlockSamples)
+            {
+                const auto m = (*ev).getMessage();
+                if (m.isNoteOn())
+                {
+                    if (heldKeys == 0)
+                        for (int i = 0; i < 2; ++i)
+                            if (lfoMode (i) == lfoModeFirstNote)
+                                sharedLfos[(size_t) i].reset (0x5EED + i + 31 * ++firstNoteSeq);
+                    ++heldKeys;
+                }
+                else if (m.isNoteOff())
+                    heldKeys = juce::jmax (0, heldKeys - 1);
+                ++ev;
+            }
+
+            const double dt = (double) controlBlockSamples / srHz;
+            for (int i = 0; i < 2; ++i)
+                sharedVals[(size_t) i][(size_t) s] =
+                    sharedLfos[(size_t) i].advance (rawParam (i == 0 ? dLfo1Rate : dLfo2Rate)->load (std::memory_order_relaxed),
+                                                    dt, lfoShape (i));
+        }
     }
 
     synth.renderNextBlock (buffer, midi, 0, buffer.getNumSamples());

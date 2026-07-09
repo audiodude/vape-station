@@ -31,13 +31,14 @@ private:
     juce::OwnedArray<ModKnob> knobs;
     std::array<ModKnob*, numDests> knobFor {};
 
-    juce::ComboBox tableBox, filterBox, lfo1ShapeBox, lfo2ShapeBox;
+    juce::ComboBox tableBox, filterBox, lfo1ShapeBox, lfo2ShapeBox, lfo1ModeBox, lfo2ModeBox;
     using ComboAtt = juce::AudioProcessorValueTreeState::ComboBoxAttachment;
-    std::unique_ptr<ComboAtt> tableAtt, filterAtt, lfo1Att, lfo2Att;
+    std::unique_ptr<ComboAtt> tableAtt, filterAtt, lfo1Att, lfo2Att, lfo1ModeAtt, lfo2ModeAtt;
 
     SourceChip env1Chip { sEnv1 }, env2Chip { sEnv2 }, env3Chip { sEnv3 },
                lfo1Chip { sLfo1 }, lfo2Chip { sLfo2 };
 
+    juce::TextButton initButton { "INIT" };
     TableViz viz;
     MatrixPanel matrix;
     juce::MidiKeyboardComponent keyboard;

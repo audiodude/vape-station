@@ -21,9 +21,9 @@ auto-copied to the platform VST3 dir (`~/.vst3` on Linux,
 `~/Library/Audio/Plug-Ins/VST3` on macOS) after building; the standalone app
 lands at `build/VapeStation_artefacts/Release/Standalone/VapeStation`.
 
-On macOS, `./deploy.sh` builds a universal (arm64 + x86_64) release and
-installs the VST3 into `~/Library/Audio/Plug-Ins/VST3`, replacing any
-previous copy.
+On macOS, `./build_and_copy_mac.sh` builds a universal (arm64 + x86_64)
+release and copies the VST3 into `~/Library/Audio/Plug-Ins/VST3`, replacing
+any previous copy.
 
 ## Verify
 
@@ -63,12 +63,17 @@ increments for times/rates/cutoff, 0.5 ms floor on envelope times, whole
 semitones/cents for Coarse/Fine, 1% for 0-1 params); host automation and
 modulation stay continuous. Envelope times run 0-10 s on a clock-calibrated
 taper: fully CCW = 0 (releases bottom out at 5 ms to stay click-free),
-9 o'clock = 250 ms, noon = 1 s, 3 o'clock = 4 s.
+9 o'clock = 250 ms, noon = 1 s, 3 o'clock = 4 s. The INIT button in the
+header resets all parameters and the mod matrix to the default patch.
 
 **Modulation** — the point of the prototype. Sources: ENV1 (amp), ENV2, ENV3,
-LFO1, LFO2 (per-voice, retriggered), velocity, mod wheel, keytrack. Any source
+LFO1, LFO2, velocity, mod wheel, keytrack. Each LFO has a mode selector:
+**Retrig** (per-voice, phase restarts every note-on and the value follows the
+note), **First Note** (one shared LFO that restarts on a note-on when no keys
+are held), or **Global** (one shared free-running LFO, never reset). Any source
 can target any of the 26 continuous parameters (including envelope times and
-LFO rates themselves):
+LFO rates themselves — rate modulation is per-voice, so it only applies in
+Retrig mode):
 
 - **Drag a coloured chip** (on the ENV/LFO panel headers, or VEL/WHEEL/KEY in
   the matrix header) **onto any knob** to create a route at +0.35 depth.

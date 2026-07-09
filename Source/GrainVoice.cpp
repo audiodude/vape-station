@@ -122,7 +122,7 @@ void GrainVoice::pitchWheelMoved (int v)
     pbSemis = ((float) v - 8192.0f) / 8192.0f * 2.0f;
 }
 
-void GrainVoice::updateControls (const GrainTable&, const CompiledMatrix* mat, int n)
+void GrainVoice::updateControls (const GrainTable&, const CompiledMatrix* mat, int n, int blockOffset)
 {
     float srcVals[numSrcs];
     srcVals[sEnv1]     = env1Last;
@@ -153,9 +153,15 @@ void GrainVoice::updateControls (const GrainTable&, const CompiledMatrix* mat, i
     env2.setParameters ({ eff[dEnv2A] * 0.001f, eff[dEnv2D] * 0.001f, eff[dEnv2S], eff[dEnv2R] * 0.001f });
     env3.setParameters ({ eff[dEnv3A] * 0.001f, eff[dEnv3D] * 0.001f, eff[dEnv3S], eff[dEnv3R] * 0.001f });
 
+    // Retrig LFOs are per-voice (rate modulation applies per voice); First
+    // Note / Global modes read the processor's shared LFO for this tick.
     const double dt = (double) n / sr;
-    lfo1Last = lfo1.advance (eff[dLfo1Rate], dt, proc.lfoShape (0));
-    lfo2Last = lfo2.advance (eff[dLfo2Rate], dt, proc.lfoShape (1));
+    lfo1Last = proc.lfoMode (0) == lfoModeRetrig
+                   ? lfo1.advance (eff[dLfo1Rate], dt, proc.lfoShape (0))
+                   : proc.sharedLfoValue (0, blockOffset);
+    lfo2Last = proc.lfoMode (1) == lfoModeRetrig
+                   ? lfo2.advance (eff[dLfo2Rate], dt, proc.lfoShape (1))
+                   : proc.sharedLfoValue (1, blockOffset);
 
     liveInc = baseFreq * std::exp2 ((double) (eff[dCoarse] + eff[dFine] * 0.01f + pbSemis) / 12.0) / sr;
 
@@ -215,7 +221,7 @@ void GrainVoice::renderNextBlock (juce::AudioBuffer<float>& out, int startSample
     while (numSamples > 0)
     {
         const int n = juce::jmin (subBlock, numSamples);
-        updateControls (tbl, mat, n);
+        updateControls (tbl, mat, n, startSample);
 
         float* L = out.getWritePointer (0, startSample);
         float* R = out.getNumChannels() > 1 ? out.getWritePointer (1, startSample) : nullptr;

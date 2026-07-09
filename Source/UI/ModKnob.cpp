@@ -23,6 +23,12 @@ ModKnob::ModKnob (VapeProcessor& p, int destIn) : proc (p), dest (destIn)
     attachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment> (
         proc.apvts, destInfos()[(size_t) dest].id, slider);
 
+    // The attachment doesn't propagate the parameter's unit label, so the
+    // drag popup would show bare numbers ("2" rather than "2 Hz").
+    if (auto* param = proc.apvts.getParameter (destInfos()[(size_t) dest].id))
+        if (param->getLabel().isNotEmpty())
+            slider.setTextValueSuffix (" " + param->getLabel());
+
     refreshRoutes();
 }
 

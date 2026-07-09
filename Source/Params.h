@@ -85,6 +85,12 @@ inline const juce::StringArray& lfoShapeNames()
     return s;
 }
 
+inline const juce::StringArray& lfoModeNames()
+{
+    static const juce::StringArray s { "Retrig", "First Note", "Global" };
+    return s;
+}
+
 inline bool isEnvTime (int d)
 {
     return d >= dEnv1A && d <= dEnv3R && d != dEnv1S && d != dEnv2S && d != dEnv3S;
@@ -215,8 +221,10 @@ inline juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout
     add (dEnv3S, range (0.0f, 1.0f), 0.6f);
     add (dEnv3R, envTimeRange (5.0f), 800.0f, "ms");
 
-    add (dLfo1Rate, range (0.02f, 20.0f, 2.0f), 2.0f,   "Hz");
-    add (dLfo2Rate, range (0.02f, 20.0f, 2.0f), 0.35f,  "Hz");
+    // Linear on purpose: 0.1 Hz is already meaninglessly slow and 5 Hz
+    // meaninglessly fast, so the whole sweep is usable without a taper.
+    add (dLfo1Rate, range (0.1f, 5.0f), 2.0f,   "Hz");
+    add (dLfo2Rate, range (0.1f, 5.0f), 0.35f,  "Hz");
 
     add (dGain, range (-60.0f, 6.0f), -8.0f, "dB");
 
@@ -225,6 +233,8 @@ inline juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout
     layout.add (std::make_unique<C> (juce::ParameterID { "filterType", 1 }, "Filter Type", filterTypeNames(), 0));
     layout.add (std::make_unique<C> (juce::ParameterID { "lfo1Shape", 1 },  "LFO1 Shape",  lfoShapeNames(),   0));
     layout.add (std::make_unique<C> (juce::ParameterID { "lfo2Shape", 1 },  "LFO2 Shape",  lfoShapeNames(),   0));
+    layout.add (std::make_unique<C> (juce::ParameterID { "lfo1Mode", 1 },   "LFO1 Mode",   lfoModeNames(),    0));
+    layout.add (std::make_unique<C> (juce::ParameterID { "lfo2Mode", 1 },   "LFO2 Mode",   lfoModeNames(),    0));
 
     return layout;
 }

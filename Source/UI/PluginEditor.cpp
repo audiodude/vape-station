@@ -19,16 +19,23 @@ VapeEditor::VapeEditor (VapeProcessor& p)
     filterBox.addItemList (filterTypeNames(), 1);
     lfo1ShapeBox.addItemList (lfoShapeNames(), 1);
     lfo2ShapeBox.addItemList (lfoShapeNames(), 1);
-    for (auto* box : { &tableBox, &filterBox, &lfo1ShapeBox, &lfo2ShapeBox })
+    lfo1ModeBox.addItemList (lfoModeNames(), 1);
+    lfo2ModeBox.addItemList (lfoModeNames(), 1);
+    for (auto* box : { &tableBox, &filterBox, &lfo1ShapeBox, &lfo2ShapeBox, &lfo1ModeBox, &lfo2ModeBox })
         addAndMakeVisible (box);
 
-    tableAtt  = std::make_unique<ComboAtt> (proc.apvts, "table", tableBox);
-    filterAtt = std::make_unique<ComboAtt> (proc.apvts, "filterType", filterBox);
-    lfo1Att   = std::make_unique<ComboAtt> (proc.apvts, "lfo1Shape", lfo1ShapeBox);
-    lfo2Att   = std::make_unique<ComboAtt> (proc.apvts, "lfo2Shape", lfo2ShapeBox);
+    tableAtt    = std::make_unique<ComboAtt> (proc.apvts, "table", tableBox);
+    filterAtt   = std::make_unique<ComboAtt> (proc.apvts, "filterType", filterBox);
+    lfo1Att     = std::make_unique<ComboAtt> (proc.apvts, "lfo1Shape", lfo1ShapeBox);
+    lfo2Att     = std::make_unique<ComboAtt> (proc.apvts, "lfo2Shape", lfo2ShapeBox);
+    lfo1ModeAtt = std::make_unique<ComboAtt> (proc.apvts, "lfo1Mode", lfo1ModeBox);
+    lfo2ModeAtt = std::make_unique<ComboAtt> (proc.apvts, "lfo2Mode", lfo2ModeBox);
 
     for (auto* chip : { &env1Chip, &env2Chip, &env3Chip, &lfo1Chip, &lfo2Chip })
         addAndMakeVisible (chip);
+
+    initButton.onClick = [this] { proc.initPatch(); };
+    addAndMakeVisible (initButton);
 
     addAndMakeVisible (viz);
     addAndMakeVisible (matrix);
@@ -89,6 +96,7 @@ void VapeEditor::resized()
     const int W = getWidth();
 
     // Header
+    initButton.setBounds (548, 20, 52, 24);
     tableBox.setBounds (660, 20, 148, 24);
     knobFor[dGain]->setBounds (908, 2, 82, 62);
 
@@ -146,11 +154,14 @@ void VapeEditor::resized()
         }
         else
         {
-            auto* box = i == 3 ? &lfo1ShapeBox : &lfo2ShapeBox;
-            box->setBounds (inner.removeFromBottom (24));
-            inner.removeFromBottom (6);
+            auto* shapeBox = i == 3 ? &lfo1ShapeBox : &lfo2ShapeBox;
+            auto* modeBox  = i == 3 ? &lfo1ModeBox  : &lfo2ModeBox;
+            shapeBox->setBounds (inner.removeFromBottom (24));
+            inner.removeFromBottom (4);
+            modeBox->setBounds (inner.removeFromBottom (24));
+            inner.removeFromBottom (4);
             const int d = i == 3 ? dLfo1Rate : dLfo2Rate;
-            knobFor[(size_t) d]->setBounds (inner.reduced (18, 0));
+            knobFor[(size_t) d]->setBounds (inner.reduced (14, 0));
         }
     }
 

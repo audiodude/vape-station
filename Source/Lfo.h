@@ -8,6 +8,15 @@ namespace vape
 
 enum LfoShape : int { lfoSine, lfoTriangle, lfoSawUp, lfoSawDown, lfoSquare, lfoSH };
 
+// Retrig: per-voice, phase restarts on every note-on (value follows the note).
+// First Note: one shared LFO, phase restarts on a note-on when no keys are held.
+// Global: one shared LFO, free-running from playback start, never reset.
+enum LfoMode : int { lfoModeRetrig, lfoModeFirstNote, lfoModeGlobal };
+
+// Modulation control-rate tick, shared by the voices and the processor's
+// global LFOs so both run on the same clock.
+inline constexpr int controlBlockSamples = 32;
+
 // Simple per-voice LFO, retriggered on note-on. Bipolar -1..1 output.
 struct Lfo
 {

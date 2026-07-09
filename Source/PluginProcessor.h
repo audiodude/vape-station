@@ -47,6 +47,10 @@ public:
     void addModRoute (int src, int dest, float depth);
     void compileMatrixNow();
 
+    // Reset every parameter to its default and restore the default mod
+    // matrix - the state of a freshly inserted instance (message thread).
+    void initPatch();
+
     // --- Services for voices (audio thread) -------------------------------
     const CompiledMatrix* currentMatrix() const { return matrix.load (std::memory_order_acquire); }
     std::atomic<float>* rawParam (int d) const { return raws[(size_t) d]; }
@@ -58,6 +62,20 @@ public:
     int lfoShape (int which) const
     {
         return (int) (which == 0 ? lfo1ShapeRaw : lfo2ShapeRaw)->load (std::memory_order_relaxed);
+    }
+    int lfoMode (int which) const
+    {
+        return (int) (which == 0 ? lfo1ModeRaw : lfo2ModeRaw)->load (std::memory_order_relaxed);
+    }
+    // Shared (First Note / Global) LFO value for the control tick covering the
+    // given sample offset into the current block. Filled at the top of
+    // processBlock and read by voices inside the same call - no locking needed.
+    float sharedLfoValue (int which, int sampleOffset) const
+    {
+        const auto& v = sharedVals[(size_t) which];
+        if (v.empty())
+            return 0.0f;
+        return v[(size_t) juce::jlimit (0, (int) v.size() - 1, sampleOffset / controlBlockSamples)];
     }
 
     // --- Display feed for the editor's animated mod indicators ------------
@@ -95,6 +113,15 @@ private:
     std::atomic<float>* filterTypeRaw = nullptr;
     std::atomic<float>* lfo1ShapeRaw = nullptr;
     std::atomic<float>* lfo2ShapeRaw = nullptr;
+    std::atomic<float>* lfo1ModeRaw = nullptr;
+    std::atomic<float>* lfo2ModeRaw = nullptr;
+
+    // Shared LFOs for First Note / Global modes (audio thread only).
+    std::array<Lfo, 2> sharedLfos;
+    std::array<std::vector<float>, 2> sharedVals;
+    int heldKeys = 0;
+    juce::int64 firstNoteSeq = 0;
+    double srHz = 48000.0;
 
     std::atomic<CompiledMatrix*> matrix { nullptr };
     // Retired snapshots are kept until destruction: edits are rare and small,
