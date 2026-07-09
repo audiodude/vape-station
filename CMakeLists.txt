@@ -27,7 +27,8 @@ set(VAPE_SOURCES
 )
 
 juce_add_plugin(VapeStation
-    COMPANY_NAME "Vibes"
+    COMPANY_NAME "audiodude"
+    BUNDLE_ID "xyz.audiodude.vapestation"
     PLUGIN_MANUFACTURER_CODE Vibz
     PLUGIN_CODE Vpst
     FORMATS VST3 Standalone

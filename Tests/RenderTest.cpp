@@ -256,7 +256,42 @@ int main (int argc, char** argv)
                "routes=" + juce::String (mbx->totalRoutes));
     }
 
-    // T6: demo render for listening
+    // T6: parameter text is tidy (no fake precision) and coarse snaps to semitones
+    {
+        VapeProcessor p;
+        auto* atk = p.apvts.getParameter ("env1A");
+        const auto txt = atk->getText (atk->convertTo0to1 (2.7543f), 0);
+        check (txt == "2.75", "param text is tidy", txt);
+
+        setParamNatural (p, "coarse", 7.3f);
+        const float coarse = p.apvts.getRawParameterValue ("coarse")->load();
+        check (std::abs (coarse - 7.0f) < 1.0e-6f, "coarse snaps to semitones",
+               juce::String (coarse, 3));
+
+        // Envelope-time taper: off = 0, 9 o'clock (3/16 travel) = 250 ms,
+        // 12 o'clock = 1 s, 3 o'clock (13/16) = 4 s, full = 10 s.
+        auto natural = [&] (float prop) { return atk->convertFrom0to1 (prop); };
+        const bool taper = natural (0.0f) == 0.0f
+                        && std::abs (natural (0.1875f) - 250.0f)   < 0.1f
+                        && std::abs (natural (0.5f)    - 1000.0f)  < 0.5f
+                        && std::abs (natural (0.8125f) - 4000.0f)  < 2.0f
+                        && std::abs (natural (1.0f)    - 10000.0f) < 5.0f;
+        check (taper, "env time taper hits clock anchors");
+
+        auto* rel = p.apvts.getParameter ("env1R");
+        check (std::abs (rel->convertFrom0to1 (0.0f) - 5.0f) < 1.0e-4f,
+               "release bottoms out at 5 ms",
+               juce::String (rel->convertFrom0to1 (0.0f), 3));
+
+        const bool grid = std::abs (snapKnobValue (dEnv1A, 3.29f)   - 3.5f)    < 1.0e-4f
+                       && std::abs (snapKnobValue (dEnv1A, 137.3f)  - 140.0f)  < 1.0e-3f
+                       && std::abs (snapKnobValue (dEnv1A, 2340.0f) - 2400.0f) < 1.0e-2f
+                       && std::abs (snapKnobValue (dCutoff, 1234.0f) - 1200.0f) < 1.0e-2f
+                       && std::abs (snapKnobValue (dPosition, 0.6789f) - 0.68f) < 1.0e-4f;
+        check (grid, "knob step grid snaps to nice values");
+    }
+
+    // T7: demo render for listening
     {
         VapeProcessor p; // default patch, including the default LFO1->position route
         Score s;
@@ -290,7 +325,7 @@ int main (int argc, char** argv)
         check (ok, "demo wav written", f.getFullPathName());
     }
 
-    // T7: editor snapshot (needs a display)
+    // T8: editor snapshot (needs a display)
     if (juce::SystemStats::getEnvironmentVariable ("DISPLAY", {}).isNotEmpty())
     {
         VapeProcessor p;

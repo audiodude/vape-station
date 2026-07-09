@@ -17,8 +17,13 @@ cmake --build build --target VapeStation_VST3 VapeStation_Standalone -j$(nproc)
 
 The first configure downloads JUCE 8.0.14 (set the `JUCE_TARBALL` env var to a
 pre-downloaded tarball path to skip the network fetch). The VST3 is
-auto-copied to `~/.vst3/VapeStation.vst3` after building; the standalone app
+auto-copied to the platform VST3 dir (`~/.vst3` on Linux,
+`~/Library/Audio/Plug-Ins/VST3` on macOS) after building; the standalone app
 lands at `build/VapeStation_artefacts/Release/Standalone/VapeStation`.
+
+On macOS, `./deploy.sh` builds a universal (arm64 + x86_64) release and
+installs the VST3 into `~/Library/Audio/Plug-Ins/VST3`, replacing any
+previous copy.
 
 ## Verify
 
@@ -52,6 +57,13 @@ read from the table at the note's pitch:
 
 Per voice: state-variable filter (LP/BP/HP), ADSR amp envelope. 10 voices,
 sustain pedal and pitch bend (±2 st) supported.
+
+Knob gestures snap to a musically spaced step grid (~5-10% "nice number"
+increments for times/rates/cutoff, 0.5 ms floor on envelope times, whole
+semitones/cents for Coarse/Fine, 1% for 0-1 params); host automation and
+modulation stay continuous. Envelope times run 0-10 s on a clock-calibrated
+taper: fully CCW = 0 (releases bottom out at 5 ms to stay click-free),
+9 o'clock = 250 ms, noon = 1 s, 3 o'clock = 4 s.
 
 **Modulation** — the point of the prototype. Sources: ENV1 (amp), ENV2, ENV3,
 LFO1, LFO2 (per-voice, retriggered), velocity, mod wheel, keytrack. Any source

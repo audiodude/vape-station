@@ -37,6 +37,13 @@ private:
             if (e.mods.isPopupMenu()) { owner.showRouteMenu(); return; }
             juce::Slider::mouseDown (e);
         }
+        // JUCE calls this for user gestures only (drag/wheel), so host
+        // automation and modulation stay continuous while the knob steps.
+        double snapValue (double attempted, DragMode) override
+        {
+            return juce::jlimit (getMinimum(), getMaximum(),
+                                 (double) snapKnobValue (owner.dest, (float) attempted));
+        }
         ModKnob& owner;
     };
 
