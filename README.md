@@ -35,11 +35,11 @@ vocal formants, inharmonic bell spectra, and raw noise-bitten textures.
 
 ## Get it
 
-Grab a build from the latest [`build` workflow run](../../actions/workflows/build.yml)
-(GitHub login required for artifact downloads): per-platform artifacts, or
-`VapeStation-all-platforms-vst3` — one cross-platform `.vst3` bundle that
-works on all three OSes (tarred so the macOS binary keeps its exec bit).
-Or build from source (below).
+Download from [Releases](../../releases/latest): a zip per platform, or the
+`all-platforms` tarball — one cross-platform `.vst3` bundle that works on
+all three OSes. Bleeding-edge builds are on the latest
+[`build` workflow run](../../actions/workflows/build.yml) as artifacts
+(GitHub login required for those). Or build from source (below).
 
 Install by dropping `VapeStation.vst3` into your VST3 folder:
 
