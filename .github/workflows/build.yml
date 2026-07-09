@@ -143,6 +143,9 @@ jobs:
       - name: Verify web engine
         run: node webapp/test/render-test.mjs
 
+      - name: Stamp version
+        run: printf "export const VERSION = '%s';\n" "$GITHUB_REF_NAME" > webapp/js/version.js
+
       - name: Deploy to Cloudflare Pages
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}

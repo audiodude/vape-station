@@ -6,6 +6,9 @@ import {
   formatValue, isBipolarSrc,
 } from './params.js';
 import { grainTables, NUM_FRAMES, FRAME_LEN } from './engine.js';
+import { VERSION } from './version.js';
+
+document.getElementById('verstamp').textContent = ` · ${VERSION}`;
 
 const SRC_COLOURS = ['#60a5fa', '#34d399', '#f87171', '#c4b5fd', '#e6f3ff', '#fbbf24', '#2dd4bf', '#f472b6'];
 const ACCENT = '#4aa5ff';
