@@ -1,0 +1,4 @@
+# Always revalidate: files are tiny and etag 304s are cheap, and stale
+# JS/HTML mixes have repeatedly broken phones after deploys.
+/*
+  Cache-Control: public, max-age=0, must-revalidate
