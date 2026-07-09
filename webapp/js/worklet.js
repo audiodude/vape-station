@@ -9,7 +9,9 @@ class VapeProcessor extends AudioWorkletProcessor {
     super();
     this.engine = new Engine(sampleRate);
     this.displayCountdown = 0;
+    this.errorSent = false;
     this.port.onmessage = (e) => this.handle(e.data);
+    this.port.postMessage({ type: 'ready', sampleRate });
   }
 
   handle(m) {
@@ -38,15 +40,24 @@ class VapeProcessor extends AudioWorkletProcessor {
   }
 
   process(inputs, outputs) {
-    const out = outputs[0];
-    const L = out[0];
-    const R = out.length > 1 ? out[1] : out[0];
-    this.engine.process(L, R, L.length);
+    // An uncaught exception here kills the node silently; report instead.
+    try {
+      const out = outputs[0];
+      const L = out[0];
+      const R = out.length > 1 ? out[1] : out[0];
+      this.engine.process(L, R, L.length);
 
-    if (--this.displayCountdown <= 0) {
-      this.displayCountdown = 12; // ~31 Hz at 128-sample blocks / 48k
-      const norms = this.engine.displayNorms();
-      this.port.postMessage({ type: 'display', norms: norms ? Array.from(norms) : null });
+      if (--this.displayCountdown <= 0) {
+        this.displayCountdown = 12; // ~31 Hz at 128-sample blocks / 48k
+        const norms = this.engine.displayNorms();
+        this.port.postMessage({ type: 'display', norms: norms ? Array.from(norms) : null,
+                                active: this.engine.voices.some((v) => v.active) });
+      }
+    } catch (err) {
+      if (!this.errorSent) {
+        this.errorSent = true;
+        this.port.postMessage({ type: 'error', message: String(err && err.stack || err) });
+      }
     }
     return true;
   }

@@ -666,25 +666,57 @@ if (navigator.requestMIDIAccess) {
 // ---------------------------------------------------------------------------
 
 let latestNorms = null;
+let engineReady = false;
+let voicesActive = false;
+const diag = document.getElementById('diag');
+
+function showDiag(text, isError = false) {
+  diag.textContent = text;
+  diag.style.color = isError ? '#f87171' : '#6b7280';
+}
+
+function refreshDiag() {
+  if (!audio) return;
+  const st = audio.ctx.state;
+  showDiag(`audio: ${st} ${Math.round(audio.ctx.sampleRate / 100) / 10}k`
+           + ` · engine ${engineReady ? 'ok' : 'loading'}${voicesActive ? ' · ♪' : ''}`,
+           st !== 'running');
+}
+
 async function startAudio() {
   if (audio) return;
-  // iOS: ask for the 'playback' session so the hardware silent switch
-  // doesn't mute Web Audio.
-  try { if (navigator.audioSession) navigator.audioSession.type = 'playback'; } catch { /* optional */ }
-  const ctx = new AudioContext({ latencyHint: 'interactive' });
-  // iOS Safari can leave a gesture-created context suspended.
-  if (ctx.state === 'suspended') await ctx.resume();
-  await ctx.audioWorklet.addModule(new URL('./worklet.js', import.meta.url));
-  const node = new AudioWorkletNode(ctx, 'vape-station', { outputChannelCount: [2] });
-  node.connect(ctx.destination);
-  node.port.onmessage = (e) => { if (e.data.type === 'display') latestNorms = e.data.norms; };
-  audio = { ctx, node };
-  sendFullState();
-  document.getElementById('startoverlay').remove();
+  try {
+    // iOS: ask for the 'playback' session so the hardware silent switch
+    // doesn't mute Web Audio.
+    try { if (navigator.audioSession) navigator.audioSession.type = 'playback'; } catch { /* optional */ }
+    const ctx = new AudioContext({ latencyHint: 'interactive' });
+    // Mobile browsers can leave a gesture-created context suspended.
+    if (ctx.state === 'suspended') await ctx.resume();
+    await ctx.audioWorklet.addModule(new URL('./worklet.js', import.meta.url));
+    const node = new AudioWorkletNode(ctx, 'vape-station', { outputChannelCount: [2] });
+    node.connect(ctx.destination);
+    node.port.onmessage = (e) => {
+      if (e.data.type === 'display') { latestNorms = e.data.norms; voicesActive = !!e.data.active; refreshDiag(); }
+      else if (e.data.type === 'ready') { engineReady = true; refreshDiag(); }
+      else if (e.data.type === 'error') showDiag(`engine error: ${e.data.message}`.slice(0, 140), true);
+    };
+    node.onprocessorerror = () => showDiag('audio engine crashed - reload the page', true);
+    ctx.onstatechange = refreshDiag;
+    audio = { ctx, node };
+    sendFullState();
+    refreshDiag();
+    document.getElementById('startoverlay').remove();
+  } catch (err) {
+    audio = null;
+    showDiag(`audio failed: ${err}`.slice(0, 140), true);
+    const hint = document.querySelector('#startoverlay .hint');
+    if (hint) hint.textContent = `audio failed: ${err} - tap to retry`;
+  }
 }
 // Start on 'click', not pointerdown: on touch devices the browser only
 // grants the user-activation Web Audio needs when the tap completes.
-document.getElementById('startoverlay').addEventListener('click', startAudio, { once: true });
+// Not {once:true} so a failed startup can be retried by tapping again.
+document.getElementById('startoverlay').addEventListener('click', startAudio);
 
 // Safety net: if the context gets suspended (tab switch, phone
 // interruptions), the next completed tap revives it.
