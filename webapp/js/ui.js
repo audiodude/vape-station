@@ -678,9 +678,12 @@ function showDiag(text, isError = false) {
 function refreshDiag() {
   if (!audio) return;
   const st = audio.ctx.state;
-  showDiag(`audio: ${st} ${Math.round(audio.ctx.sampleRate / 100) / 10}k`
-           + ` · engine ${engineReady ? 'ok' : 'loading'}${voicesActive ? ' · ♪' : ''}`,
-           st !== 'running');
+  // The note indicator leads (always present, opacity-toggled) so it
+  // doesn't reflow the header when notes start and stop.
+  diag.innerHTML = `<span style="opacity:${voicesActive ? 1 : 0.15}">♪</span> `
+    + `audio: ${st} ${Math.round(audio.ctx.sampleRate / 100) / 10}k`
+    + ` · engine ${engineReady ? 'ok' : 'loading'}`;
+  diag.style.color = st !== 'running' ? '#f87171' : '#6b7280';
 }
 
 async function startAudio() {
