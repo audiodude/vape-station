@@ -682,11 +682,13 @@ async function startAudio() {
   sendFullState();
   document.getElementById('startoverlay').remove();
 }
-document.getElementById('startoverlay').addEventListener('pointerdown', startAudio, { once: true });
+// Start on 'click', not pointerdown: on touch devices the browser only
+// grants the user-activation Web Audio needs when the tap completes.
+document.getElementById('startoverlay').addEventListener('click', startAudio, { once: true });
 
-// Safety net: if the context gets suspended (tab switch, iOS interruptions),
-// any touch revives it.
-window.addEventListener('pointerdown', () => {
+// Safety net: if the context gets suspended (tab switch, phone
+// interruptions), the next completed tap revives it.
+window.addEventListener('pointerup', () => {
   if (audio && audio.ctx.state === 'suspended') audio.ctx.resume();
 }, { capture: true });
 

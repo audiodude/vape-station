@@ -153,14 +153,20 @@ jobs:
         run: npx --yes wrangler pages deploy webapp --project-name=vapestation --branch=main
 
       # The custom domain caches assets for 4h; purge so releases are
-      # visible immediately. (Verified: purge_everything does evict the
-      # Pages-layer objects on this zone — next fetch is a MISS.)
+      # visible immediately. purge_everything alone has been observed to
+      # leave Pages-layer objects revalidating stale (bogus 304s), so also
+      # purge the app's URLs explicitly — that eviction is reliable.
       - name: Purge zone cache
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
         run: |
-          curl -sf -X POST \
-            -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
-            -H "Content-Type: application/json" \
-            "https://api.cloudflare.com/client/v4/zones/${{ secrets.CLOUDFLARE_ZONE_ID }}/purge_cache" \
-            -d '{"purge_everything":true}' | grep -q '"success": *true'
+          purge() {
+            curl -sf -X POST \
+              -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
+              -H "Content-Type: application/json" \
+              "https://api.cloudflare.com/client/v4/zones/${{ secrets.CLOUDFLARE_ZONE_ID }}/purge_cache" \
+              -d "$1" | grep -q '"success": *true'
+          }
+          purge '{"purge_everything":true}'
+          B="https://vapestation.audiodude.xyz"
+          purge "{\"files\":[\"$B/\",\"$B/index.html\",\"$B/js/ui.js\",\"$B/js/engine.js\",\"$B/js/params.js\",\"$B/js/worklet.js\",\"$B/js/version.js\"]}"
