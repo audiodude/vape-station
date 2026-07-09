@@ -17,6 +17,8 @@ enum Src : int
     numSrcs
 };
 
+inline bool isBipolarSrc (int s) { return s == sLfo1 || s == sLfo2 || s == sKey; }
+
 inline const char* srcName (int s)
 {
     static const char* names[numSrcs] = { "ENV1", "ENV2", "ENV3", "LFO1", "LFO2", "VEL", "WHEEL", "KEY" };

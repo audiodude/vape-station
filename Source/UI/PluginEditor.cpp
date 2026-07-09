@@ -3,12 +3,22 @@
 namespace vape
 {
 
+// Rainfall layout: 1240px content, 20px side / 24px top padding, 12px gaps.
+namespace
+{
+    constexpr int kPadX = 20, kPadY = 24, kGap = 12;
+    constexpr int kHeaderH = 88, kRow1H = 284, kRow2H = 198, kMatrixH = 106, kKeysH = 114;
+    constexpr int kWidth = 1280;
+    constexpr int kHeight = kPadY + kHeaderH + kGap + kRow1H + kGap + kRow2H + kGap
+                          + kMatrixH + kGap + kKeysH + kPadY;
+}
+
 VapeEditor::VapeEditor (VapeProcessor& p)
     : juce::AudioProcessorEditor (p),
       proc (p),
       viz (p),
       matrix (p),
-      keyboard (p.keyboardState, juce::MidiKeyboardComponent::horizontalKeyboard)
+      keyboard (p.keyboardState)
 {
     setLookAndFeel (&lnf);
 
@@ -38,12 +48,19 @@ VapeEditor::VapeEditor (VapeProcessor& p)
     addAndMakeVisible (initButton);
 
     addAndMakeVisible (viz);
+
+    posSlider.setSliderStyle (juce::Slider::LinearHorizontal);
+    posSlider.setTextBoxStyle (juce::Slider::NoTextBox, false, 0, 0);
+    posSlider.setColour (juce::Slider::trackColourId, theme::accent);
+    posSlider.setPopupDisplayEnabled (true, true, nullptr);
+    addAndMakeVisible (posSlider);
+    posAtt = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment> (
+        proc.apvts, destInfos()[dPosition].id, posSlider);
+
     addAndMakeVisible (matrix);
     addAndMakeVisible (keyboard);
-    keyboard.setLowestVisibleKey (36);
-    keyboard.setKeyWidth (22.0f);
 
-    setSize (1000, 735);
+    setSize (kWidth, kHeight);
     startTimerHz (30);
 }
 
@@ -61,113 +78,168 @@ ModKnob* VapeEditor::addKnob (int dest)
 
 void VapeEditor::paint (juce::Graphics& g)
 {
-    g.fillAll (theme::bg);
+    g.fillAll (theme::canvas);
 
-    g.setFont (juce::FontOptions (21.0f, juce::Font::bold));
-    g.setColour (theme::accent);
-    g.drawText ("VAPE", 14, 12, 62, 24, juce::Justification::centredLeft);
-    g.setColour (theme::text);
-    g.drawText ("STATION", 78, 12, 140, 24, juce::Justification::centredLeft);
-
-    g.setColour (theme::dim);
-    g.setFont (juce::FontOptions (10.5f));
-    g.drawText ("graintable prototype  -  drag a coloured chip onto any knob",
-                14, 38, 400, 14, juce::Justification::centredLeft);
-
-    g.setFont (juce::FontOptions (10.5f, juce::Font::bold));
-    g.drawText ("TABLE", 614, 20, 44, 24, juce::Justification::centredLeft);
-
-    for (const auto& p : panels)
+    // Header band
+    theme::drawPanel (g, headerRect.toFloat());
     {
-        const auto r = p.r.toFloat();
-        g.setColour (theme::panel);
-        g.fillRoundedRectangle (r, 8.0f);
-        g.setColour (theme::panelLine);
-        g.drawRoundedRectangle (r.reduced (0.5f), 8.0f, 1.0f);
+        const int x = headerRect.getX() + 20;
+        int y = headerRect.getCentreY() - 18;
+        auto wordmark = theme::fontBlack (22.0f).withExtraKerningFactor (0.02f);
+        g.setFont (wordmark);
+        const auto vape = juce::String ("VAPE");
+        const float vapeW = theme::textWidth (wordmark, vape);
+        g.setColour (theme::accent);
+        g.drawText (vape, x, y, 200, 24, juce::Justification::centredLeft);
+        g.setColour (theme::strong);
+        g.drawText (" STATION", x + (int) vapeW, y, 220, 24, juce::Justification::centredLeft);
+
         g.setColour (theme::dim);
-        g.setFont (juce::FontOptions (10.5f, juce::Font::bold));
-        g.drawText (p.title, p.r.getX() + 12, p.r.getY() + 6, 150, 12, juce::Justification::centredLeft);
+        g.setFont (theme::font (11.0f));
+        g.drawText ("drag a coloured chip onto any knob",
+                    x, y + 26, 400, 14, juce::Justification::centredLeft);
+
+        // "TABLE" label sits just left of the table select
+        g.setFont (theme::titleFont());
+        g.drawText ("TABLE", tableBox.getX() - 58, tableBox.getY(), 50, tableBox.getHeight(),
+                    juce::Justification::centredRight);
     }
+
+    for (const auto& pn : panels)
+    {
+        theme::drawPanel (g, pn.r.toFloat());
+        if (pn.title.isNotEmpty())
+        {
+            g.setColour (theme::dim);
+            g.setFont (theme::titleFont());
+            g.drawText (pn.title, pn.r.getX() + 16, pn.r.getY() + 12, 180, 13,
+                        juce::Justification::centredLeft);
+        }
+    }
+
+    // Keyboard bed
+    theme::drawWell (g, kbBedRect.toFloat());
 }
 
 void VapeEditor::resized()
 {
     panels.clear();
-    const int W = getWidth();
+    auto content = getLocalBounds().reduced (kPadX, kPadY);
 
-    // Header
-    initButton.setBounds (548, 20, 52, 24);
-    tableBox.setBounds (660, 20, 148, 24);
-    knobFor[dGain]->setBounds (908, 2, 82, 62);
-
-    // Row A: graintable viz | OSC | FILTER
-    viz.setBounds (10, 66, 300, 225);
-
-    const juce::Rectangle<int> oscR (320, 66, 470, 225);
-    panels.push_back ({ "OSC", oscR });
+    // --- Header ---
+    headerRect = content.removeFromTop (kHeaderH);
     {
-        auto inner = oscR.reduced (8).withTrimmedTop (16);
-        const int cw = inner.getWidth() / 3;
-        const int ch = inner.getHeight() / 3;
-        const int order[9] = { dPosition, dGrainSize, dDensity,
-                               dSpray, dPitchRand, dShape,
-                               dCoarse, dFine, dSpread };
-        for (int i = 0; i < 9; ++i)
-            knobFor[(size_t) order[i]]->setBounds (inner.getX() + (i % 3) * cw,
-                                                   inner.getY() + (i / 3) * ch, cw, ch);
+        auto h = headerRect.reduced (20, 14);
+        // right side, laid right-to-left: Gain knob, TABLE select, INIT
+        auto gainCell = h.removeFromRight (56);
+        knobFor[dGain]->setBounds (gainCell.withSizeKeepingCentre (56, 60));
+        h.removeFromRight (16);
+        tableBox.setBounds (h.removeFromRight (130).withSizeKeepingCentre (130, 30));
+        h.removeFromRight (66); // room for the painted "TABLE" label
+        initButton.setBounds (h.removeFromRight (62).withSizeKeepingCentre (62, 28));
     }
+    content.removeFromTop (kGap);
 
-    const juce::Rectangle<int> filR (800, 66, W - 810, 225);
-    panels.push_back ({ "FILTER", filR });
+    // --- Row 1: GRAINTABLE / OSC / FILTER ---
+    auto row1 = content.removeFromTop (kRow1H);
     {
-        auto inner = filR.reduced (10).withTrimmedTop (16);
-        filterBox.setBounds (inner.removeFromTop (24));
-        inner.removeFromTop (8);
-        const int half = inner.getWidth() / 2;
-        knobFor[dCutoff]->setBounds (inner.getX(), inner.getY() + 14, half, 120);
-        knobFor[dRes]->setBounds (inner.getX() + half, inner.getY() + 14, half, 120);
-    }
+        auto gtR = row1.removeFromLeft (360);
+        panels.push_back ({ "GRAINTABLE", gtR });
+        auto inner = gtR.reduced (16, 14);
+        inner.removeFromTop (13 + 12); // title + gap
+        posSlider.setBounds (inner.removeFromBottom (16));
+        inner.removeFromBottom (12);
+        viz.setBounds (inner);
 
-    // Row B: ENV1 / ENV2 / ENV3 / LFO1 / LFO2
-    const int by = 299, bh = 190, gap = 8;
-    const int pw = (W - 20 - 4 * gap) / 5;
-    SourceChip* rowChips[5] = { &env1Chip, &env2Chip, &env3Chip, &lfo1Chip, &lfo2Chip };
-    const char* rowTitles[5] = { "ENV 1 - AMP", "ENV 2", "ENV 3", "LFO 1", "LFO 2" };
-    const int envDests[3][4] = { { dEnv1A, dEnv1D, dEnv1S, dEnv1R },
-                                 { dEnv2A, dEnv2D, dEnv2S, dEnv2R },
-                                 { dEnv3A, dEnv3D, dEnv3S, dEnv3R } };
+        row1.removeFromLeft (kGap);
+        auto filR = row1.removeFromRight (250);
+        auto oscR = row1.withTrimmedRight (kGap);
 
-    for (int i = 0; i < 5; ++i)
-    {
-        const juce::Rectangle<int> r (10 + i * (pw + gap), by, pw, bh);
-        panels.push_back ({ rowTitles[i], r });
-        rowChips[i]->setBounds (r.getRight() - 64, r.getY() + 5, 58, 17);
-
-        auto inner = r.reduced (8).withTrimmedTop (18);
-        if (i < 3)
+        panels.push_back ({ "OSC", oscR });
         {
-            const int cw = inner.getWidth() / 2;
-            const int ch = inner.getHeight() / 2;
-            for (int k = 0; k < 4; ++k)
-                knobFor[(size_t) envDests[i][k]]->setBounds (inner.getX() + (k % 2) * cw,
-                                                             inner.getY() + (k / 2) * ch, cw, ch);
+            auto oin = oscR.reduced (16, 12);
+            oin.removeFromTop (13 + 10);
+            const int cw = oin.getWidth() / 3;
+            const int ch = oin.getHeight() / 3;
+            const int order[9] = { dPosition, dGrainSize, dDensity,
+                                   dSpray, dPitchRand, dShape,
+                                   dCoarse, dFine, dSpread };
+            for (int i = 0; i < 9; ++i)
+                knobFor[(size_t) order[i]]->setBounds (
+                    juce::Rectangle<int> (oin.getX() + (i % 3) * cw, oin.getY() + (i / 3) * ch, cw, ch)
+                        .withSizeKeepingCentre (84, juce::jmin (ch, 56 + 3 + 13)));
         }
-        else
+
+        panels.push_back ({ "FILTER", filR });
         {
-            auto* shapeBox = i == 3 ? &lfo1ShapeBox : &lfo2ShapeBox;
-            auto* modeBox  = i == 3 ? &lfo1ModeBox  : &lfo2ModeBox;
-            shapeBox->setBounds (inner.removeFromBottom (24));
-            inner.removeFromBottom (4);
-            modeBox->setBounds (inner.removeFromBottom (24));
-            inner.removeFromBottom (4);
-            const int d = i == 3 ? dLfo1Rate : dLfo2Rate;
-            knobFor[(size_t) d]->setBounds (inner.reduced (14, 0));
+            auto fin = filR.reduced (16, 14);
+            fin.removeFromTop (13 + 12);
+            filterBox.setBounds (fin.removeFromTop (30));
+            const int half = fin.getWidth() / 2;
+            const int kh = juce::jmin (fin.getHeight(), 72 + 3 + 13);
+            knobFor[dCutoff]->setBounds (juce::Rectangle<int> (fin.getX(), fin.getY(), half, fin.getHeight())
+                                             .withSizeKeepingCentre (half, kh));
+            knobFor[dRes]->setBounds (juce::Rectangle<int> (fin.getX() + half, fin.getY(), half, fin.getHeight())
+                                          .withSizeKeepingCentre (half, kh));
         }
     }
+    content.removeFromTop (kGap);
 
-    // Matrix + keyboard
-    matrix.setBounds (10, 497, W - 20, 148);
-    keyboard.setBounds (10, 653, W - 20, 72);
+    // --- Row 2: ENV1 / ENV2 / ENV3 / LFO1 / LFO2 (LFOs flex 1.1) ---
+    auto row2 = content.removeFromTop (kRow2H);
+    {
+        const float unit = (float) (row2.getWidth() - 4 * kGap) / 5.2f;
+        const int envW = (int) unit;
+        const int lfoW = (int) (unit * 1.1f);
+
+        SourceChip* rowChips[5] = { &env1Chip, &env2Chip, &env3Chip, &lfo1Chip, &lfo2Chip };
+        const char* rowTitles[5] = { "ENV 1 - AMP", "ENV 2", "ENV 3", "LFO 1", "LFO 2" };
+        const int envDests[3][4] = { { dEnv1A, dEnv1D, dEnv1S, dEnv1R },
+                                     { dEnv2A, dEnv2D, dEnv2S, dEnv2R },
+                                     { dEnv3A, dEnv3D, dEnv3S, dEnv3R } };
+
+        for (int i = 0; i < 5; ++i)
+        {
+            auto r = row2.removeFromLeft (i < 3 ? envW : lfoW);
+            if (i < 4)
+                row2.removeFromLeft (kGap);
+            panels.push_back ({ rowTitles[i], r });
+
+            auto inner = r.reduced (14, 12);
+            auto head = inner.removeFromTop (18);
+            rowChips[i]->setBounds (head.removeFromRight (i < 3 ? 58 : 56));
+            inner.removeFromTop (10);
+
+            if (i < 3)
+            {
+                const int cw = inner.getWidth() / 2;
+                const int ch = inner.getHeight() / 2;
+                for (int k = 0; k < 4; ++k)
+                    knobFor[(size_t) envDests[i][k]]->setBounds (
+                        juce::Rectangle<int> (inner.getX() + (k % 2) * cw, inner.getY() + (k / 2) * ch, cw, ch)
+                            .withSizeKeepingCentre (cw, juce::jmin (ch, 50 + 3 + 13)));
+            }
+            else
+            {
+                auto* shapeBox = i == 3 ? &lfo1ShapeBox : &lfo2ShapeBox;
+                auto* modeBox  = i == 3 ? &lfo1ModeBox  : &lfo2ModeBox;
+                shapeBox->setBounds (inner.removeFromBottom (26));
+                inner.removeFromBottom (6);
+                modeBox->setBounds (inner.removeFromBottom (26));
+                inner.removeFromBottom (6);
+                const int d = i == 3 ? dLfo1Rate : dLfo2Rate;
+                knobFor[(size_t) d]->setBounds (inner.withSizeKeepingCentre (84, juce::jmin (inner.getHeight(), 62 + 3 + 13)));
+            }
+        }
+    }
+    content.removeFromTop (kGap);
+
+    // --- Matrix + keyboard ---
+    matrix.setBounds (content.removeFromTop (kMatrixH));
+    content.removeFromTop (kGap);
+    kbBedRect = content.removeFromTop (kKeysH);
+    keyboard.setBounds (kbBedRect.reduced (8));
+    keyboard.setKeyWidth ((float) keyboard.getWidth() / 35.0f);
 }
 
 void VapeEditor::timerCallback()

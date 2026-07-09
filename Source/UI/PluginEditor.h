@@ -5,6 +5,7 @@
 #include "ModKnob.h"
 #include "MatrixPanel.h"
 #include "TableViz.h"
+#include "VapeKeyboard.h"
 #include "../PluginProcessor.h"
 
 namespace vape
@@ -40,11 +41,14 @@ private:
 
     juce::TextButton initButton { "INIT" };
     TableViz viz;
+    juce::Slider posSlider;
+    std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> posAtt;
     MatrixPanel matrix;
-    juce::MidiKeyboardComponent keyboard;
+    VapeKeyboard keyboard;
 
     struct Panel { juce::String title; juce::Rectangle<int> r; };
     std::vector<Panel> panels;
+    juce::Rectangle<int> headerRect, kbBedRect;
 
     juce::uint32 lastStamp = 0;
     juce::uint32 lastFreshMs = 0;

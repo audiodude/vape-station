@@ -3,20 +3,46 @@
 namespace vape
 {
 
+namespace
+{
+    // OSC knobs show a white value dot (no arc) so modulation arcs stay readable.
+    bool isOscDest (int d)
+    {
+        return d == dPosition || d == dGrainSize || d == dDensity || d == dSpray
+            || d == dPitchRand || d == dShape || d == dCoarse || d == dFine || d == dSpread;
+    }
+
+    // Value-arc colour for non-OSC knobs: panel source colour for ENV/LFO
+    // knobs, brand blue for Filter/Gain.
+    juce::Colour arcColourFor (int d)
+    {
+        if (d >= dEnv1A && d <= dEnv1R) return theme::srcColour (sEnv1);
+        if (d >= dEnv2A && d <= dEnv2R) return theme::srcColour (sEnv2);
+        if (d >= dEnv3A && d <= dEnv3R) return theme::srcColour (sEnv3);
+        if (d == dLfo1Rate)             return theme::srcColour (sLfo1);
+        if (d == dLfo2Rate)             return theme::srcColour (sLfo2);
+        return theme::accent;
+    }
+} // namespace
+
 ModKnob::ModKnob (VapeProcessor& p, int destIn) : proc (p), dest (destIn)
 {
     slider.setSliderStyle (juce::Slider::RotaryHorizontalVerticalDrag);
     slider.setTextBoxStyle (juce::Slider::NoTextBox, false, 0, 0);
-    slider.setRotaryParameters (juce::MathConstants<float>::pi * 1.2f,
-                                juce::MathConstants<float>::pi * 2.8f, true);
+    // Rainfall knob: 270 degree sweep starting at 7:30.
+    slider.setRotaryParameters (juce::MathConstants<float>::pi * 1.25f,
+                                juce::MathConstants<float>::pi * 2.75f, true);
     slider.setPopupDisplayEnabled (true, true, nullptr);
+    slider.getProperties().set ("oscKnob", isOscDest (dest));
+    slider.setColour (juce::Slider::rotarySliderFillColourId, arcColourFor (dest));
     // Mod rings extend beyond the slider's own bounds and anchor to its value.
     slider.onValueChange = [this] { repaint(); };
     addAndMakeVisible (slider);
 
     label.setText (destInfos()[(size_t) dest].name, juce::dontSendNotification);
     label.setJustificationType (juce::Justification::centred);
-    label.setFont (juce::Font (juce::FontOptions (10.5f)));
+    label.setFont (theme::font (11.0f));
+    label.setColour (juce::Label::textColourId, theme::dim);
     label.setInterceptsMouseClicks (false, false);
     addAndMakeVisible (label);
 
@@ -67,28 +93,58 @@ void ModKnob::paintOverChildren (juce::Graphics& g)
     };
 
     const float baseProp = (float) slider.valueToProportionOfLength (slider.getValue());
+    const bool oscKnob = (bool) slider.getProperties().getWithDefault ("oscKnob", false);
 
+    // Modulation arcs anchor at the value dot and span the range the source
+    // can actually reach: unipolar sources (ENV/VEL/WHEEL) push one way, so
+    // the arc sweeps from the value by the depth; bipolar sources (LFO/KEY)
+    // swing both ways, so the arc extends symmetrically around the value.
+    // First arc sits on the track ring (width 3), the second just outside
+    // (width 2), further routes step outward.
     int ringIdx = 0;
     for (const auto& r : routes)
     {
+        const float startProp = juce::jlimit (0.0f, 1.0f,
+                                              isBipolarSrc (r.src) ? baseProp - r.depth : baseProp);
         const float endProp = juce::jlimit (0.0f, 1.0f, baseProp + r.depth);
-        const float radius = geo.radius + 3.5f + (float) ringIdx * 3.0f;
+        const bool onTrack = oscKnob && ringIdx == 0;
+        const float radius = onTrack ? geo.ring()
+                                     : geo.recess() + 0.5f * geo.scale
+                                           + (float) (ringIdx - (oscKnob ? 1 : 0)) * 3.5f * geo.scale;
+        const float width = onTrack ? 3.0f * geo.scale : 2.0f * geo.scale;
 
         juce::Path arc;
         arc.addCentredArc (geo.centre.x, geo.centre.y, radius, radius, 0.0f,
-                           angleFor (baseProp), angleFor (endProp), true);
-        g.setColour (theme::srcColour (r.src).withAlpha (0.85f));
-        g.strokePath (arc, juce::PathStrokeType (2.0f, juce::PathStrokeType::curved,
+                           angleFor (startProp), angleFor (endProp), true);
+        g.setColour (theme::srcColour (r.src));
+        g.strokePath (arc, juce::PathStrokeType (juce::jmax (1.5f, width), juce::PathStrokeType::curved,
                                                  juce::PathStrokeType::rounded));
         if (++ringIdx >= 4)
             break;
     }
 
+    // Live modulated value dot (white) for modulated knobs.
     if (! routes.empty() && dispNorm >= 0.0f)
     {
-        const auto p = geo.centre.getPointOnCircumference (geo.radius, angleFor (dispNorm));
-        g.setColour (juce::Colours::white);
+        const auto p = geo.centre.getPointOnCircumference (geo.ring(), angleFor (dispNorm));
+        g.setColour (theme::strong);
         g.fillEllipse (juce::Rectangle<float> (5.0f, 5.0f).withCentre (p));
+    }
+
+    // Source-coloured dots (7px) beside the label for modulated knobs.
+    if (! routes.empty())
+    {
+        const auto lb = label.getBounds().toFloat();
+        const float textW = theme::textWidth (theme::font (11.0f), label.getText());
+        float dx = lb.getCentreX() + textW / 2.0f + 6.0f;
+        for (const auto& r : routes)
+        {
+            g.setColour (theme::srcColour (r.src));
+            g.fillEllipse (dx, lb.getCentreY() - 3.5f, 7.0f, 7.0f);
+            dx += 10.0f;
+            if (dx > lb.getRight() - 4.0f)
+                break;
+        }
     }
 
     if (dragOver)

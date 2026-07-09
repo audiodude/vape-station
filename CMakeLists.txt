@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.22)
-project(VapeStation VERSION 1.0.0 LANGUAGES C CXX)
+project(VapeStation VERSION 1.0.1 LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -29,6 +29,13 @@ set(VAPE_SOURCES
     Source/UI/PluginEditor.cpp
 )
 
+juce_add_binary_data(VapeAssets
+    SOURCES
+        Assets/fonts/Roboto-Regular.ttf
+        Assets/fonts/Roboto-Medium.ttf
+        Assets/fonts/Roboto-Black.ttf
+)
+
 juce_add_plugin(VapeStation
     COMPANY_NAME "audiodude"
     BUNDLE_ID "xyz.audiodude.vapestation"
@@ -56,6 +63,7 @@ target_compile_definitions(VapeStation
 
 target_link_libraries(VapeStation
     PRIVATE
+        VapeAssets
         juce::juce_audio_utils
         juce::juce_dsp
     PUBLIC
@@ -73,6 +81,7 @@ target_compile_definitions(RenderTest
 )
 target_link_libraries(RenderTest
     PRIVATE
+        VapeAssets
         juce::juce_audio_utils
         juce::juce_dsp
         juce::juce_recommended_config_flags

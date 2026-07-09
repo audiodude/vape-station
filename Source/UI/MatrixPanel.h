@@ -7,8 +7,9 @@
 namespace vape
 {
 
-// Lists every modulation route with an editable depth slider and remove
-// button. Also hosts the performance-source chips (VEL / WHEEL / KEY).
+// Lists every modulation route in a two-column grid sorted by source, with a
+// bipolar depth slider, monospace value box, and circled-X remove button.
+// Also hosts the performance-source chips (VEL / WHEEL / KEY).
 class MatrixPanel : public juce::Component,
                     private juce::ValueTree::Listener
 {
@@ -17,9 +18,21 @@ public:
     ~MatrixPanel() override;
 
     void paint (juce::Graphics& g) override;
+    void paintOverChildren (juce::Graphics& g) override;
     void resized() override;
 
 private:
+    // Viewport that reports scrolling so the overflow arrows can repaint.
+    struct MatrixViewport : juce::Viewport
+    {
+        std::function<void()> onScroll;
+        void visibleAreaChanged (const juce::Rectangle<int>&) override
+        {
+            if (onScroll)
+                onScroll();
+        }
+    };
+
     struct Row : juce::Component
     {
         Row (VapeProcessor& p, juce::ValueTree nodeIn);
@@ -28,9 +41,10 @@ private:
 
         juce::ValueTree node;
         int src = 0;
-        juce::String labelText;
+        int dst = 0;
+        juce::String destText;
         juce::Slider depth;
-        juce::TextButton kill { "x" };
+        KillButton kill;
     };
 
     void rebuild();
@@ -49,7 +63,7 @@ private:
     void valueTreeParentChanged (juce::ValueTree&) override {}
 
     VapeProcessor& proc;
-    juce::Viewport viewport;
+    MatrixViewport viewport;
     juce::Component content;
     juce::OwnedArray<Row> rows;
     SourceChip velChip { sVelocity }, wheelChip { sWheel }, keyChip { sKey };

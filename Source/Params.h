@@ -140,13 +140,13 @@ inline juce::String formatParamValue (float v, int)
 }
 
 // Envelope-time taper, calibrated to the knob's clock positions (it sweeps
-// 288 degrees, 7 -> 5 o'clock): fully CCW = floorMs (0 = "off"; releases pass
+// 270 degrees, 7:30 -> 4:30): fully CCW = floorMs (0 = "off"; releases pass
 // 5 ms so they stay click-free), 9 o'clock = 250 ms, 12 o'clock = 1 s,
 // 3 o'clock = 4 s, fully CW = 10 s. Log-linear between anchors; the first
 // segment starts at max(floorMs, 1 ms) so short times keep usable travel.
 inline juce::NormalisableRange<float> envTimeRange (float floorMs = 0.0f)
 {
-    const std::array<float, 5> P { 0.0f, 0.1875f, 0.5f, 0.8125f, 1.0f };                     // knob travel
+    const std::array<float, 5> P { 0.0f, 1.0f / 6.0f, 0.5f, 5.0f / 6.0f, 1.0f };            // knob travel
     const std::array<float, 5> V { juce::jmax (1.0f, floorMs), 250.0f, 1000.0f, 4000.0f, 10000.0f }; // ms
 
     auto from01 = [=] (float, float, float p)

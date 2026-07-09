@@ -268,14 +268,14 @@ int main (int argc, char** argv)
         check (std::abs (coarse - 7.0f) < 1.0e-6f, "coarse snaps to semitones",
                juce::String (coarse, 3));
 
-        // Envelope-time taper: off = 0, 9 o'clock (3/16 travel) = 250 ms,
-        // 12 o'clock = 1 s, 3 o'clock (13/16) = 4 s, full = 10 s.
+        // Envelope-time taper: off = 0, 9 o'clock (1/6 travel of the 270 deg
+        // sweep) = 250 ms, 12 o'clock = 1 s, 3 o'clock (5/6) = 4 s, full = 10 s.
         auto natural = [&] (float prop) { return atk->convertFrom0to1 (prop); };
         const bool taper = natural (0.0f) == 0.0f
-                        && std::abs (natural (0.1875f) - 250.0f)   < 0.1f
-                        && std::abs (natural (0.5f)    - 1000.0f)  < 0.5f
-                        && std::abs (natural (0.8125f) - 4000.0f)  < 2.0f
-                        && std::abs (natural (1.0f)    - 10000.0f) < 5.0f;
+                        && std::abs (natural (1.0f / 6.0f) - 250.0f)   < 0.1f
+                        && std::abs (natural (0.5f)        - 1000.0f)  < 0.5f
+                        && std::abs (natural (5.0f / 6.0f) - 4000.0f)  < 2.0f
+                        && std::abs (natural (1.0f)        - 10000.0f) < 5.0f;
         check (taper, "env time taper hits clock anchors");
 
         auto* rel = p.apvts.getParameter ("env1R");
@@ -394,10 +394,23 @@ int main (int argc, char** argv)
         check (ok, "demo wav written", f.getFullPathName());
     }
 
-    // T9: editor snapshot (needs a display)
+    // T9: editor snapshot (needs a display; macOS always has a window server
+    // when run from a logged-in session)
+#if JUCE_MAC
+    if (true)
+#else
     if (juce::SystemStats::getEnvironmentVariable ("DISPLAY", {}).isNotEmpty())
+#endif
     {
         VapeProcessor p;
+        // A busy patch so the snapshot exercises mod arcs, label dots, and
+        // matrix overflow (scrollbar + arrows).
+        p.addModRoute (sEnv2, dCutoff, 0.5f);
+        p.addModRoute (sLfo2, dShape, 0.35f);
+        p.addModRoute (sVelocity, dSpray, 0.4f);
+        p.addModRoute (sKey, dRes, -0.3f);
+        p.addModRoute (sWheel, dDensity, 0.25f);
+        p.compileMatrixNow();
         std::unique_ptr<juce::AudioProcessorEditor> ed (p.createEditor());
         juce::MessageManager::getInstance()->runDispatchLoopUntil (250);
         auto img = ed->createComponentSnapshot (ed->getLocalBounds());
