@@ -1,0 +1,57 @@
+name: build
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: ${{ matrix.name }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            name: linux-x64
+          - os: windows-latest
+            name: windows-x64
+          - os: macos-latest
+            name: macos-universal
+            cmake_flags: -DCMAKE_OSX_ARCHITECTURES="arm64;x86_64"
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install JUCE Linux deps
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libasound2-dev libfreetype6-dev libfontconfig1-dev \
+            libx11-dev libxcomposite-dev libxcursor-dev libxext-dev libxinerama-dev \
+            libxrandr-dev libxrender-dev pkg-config
+
+      - name: Configure
+        run: cmake -B build -DCMAKE_BUILD_TYPE=Release -DVAPE_COPY_PLUGIN=OFF ${{ matrix.cmake_flags }}
+
+      - name: Build
+        run: cmake --build build --config Release --target VapeStation_VST3 RenderTest --parallel
+
+      # Upload before testing so the binary survives a failing check.
+      - name: Upload VST3
+        uses: actions/upload-artifact@v4
+        with:
+          name: VapeStation-${{ matrix.name }}-vst3
+          path: build/VapeStation_artefacts/Release/VST3/VapeStation.vst3
+
+      - name: RenderTest
+        shell: bash
+        run: ./build/RenderTest_artefacts/Release/RenderTest rt-out
+
+      - name: Upload test output
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: rendertest-output-${{ matrix.name }}
+          path: rt-out

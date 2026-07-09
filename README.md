@@ -25,10 +25,11 @@ On macOS, `./build_and_copy_mac.sh` builds a universal (arm64 + x86_64)
 release and copies the VST3 into `~/Library/Audio/Plug-Ins/VST3`, replacing
 any previous copy.
 
-Windows binaries come from CI: the `windows` GitHub Actions workflow
-(`.github/workflows/windows.yml`) builds the VST3 and runs RenderTest on
-every push to `main` (or manually via workflow dispatch); download the
-`VapeStation-windows-x64-vst3` artifact from the run. Pass
+CI builds all three platforms: the `build` GitHub Actions workflow
+(`.github/workflows/build.yml`) builds the VST3 and runs RenderTest on
+Linux (x64), Windows (x64), and macOS (universal) on every push to `main`
+(or manually via workflow dispatch); download the
+`VapeStation-<platform>-vst3` artifact from the run. Pass
 `-DVAPE_COPY_PLUGIN=OFF` to CMake to skip the local install-after-build
 copy step (CI does this).
 
