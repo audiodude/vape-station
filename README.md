@@ -29,7 +29,10 @@ CI builds all three platforms: the `build` GitHub Actions workflow
 (`.github/workflows/build.yml`) builds the VST3 and runs RenderTest on
 Linux (x64), Windows (x64), and macOS (universal) on every push to `main`
 (or manually via workflow dispatch); download the
-`VapeStation-<platform>-vst3` artifact from the run. Pass
+`VapeStation-<platform>-vst3` artifact from the run, or
+`VapeStation-all-platforms-vst3` — a single cross-platform `.vst3` bundle
+(tarred to preserve the macOS binary's exec bit) that works on all three
+OSes per the VST3 bundle spec. Pass
 `-DVAPE_COPY_PLUGIN=OFF` to CMake to skip the local install-after-build
 copy step (CI does this).
 

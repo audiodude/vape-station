@@ -55,3 +55,37 @@ jobs:
         with:
           name: rendertest-output-${{ matrix.name }}
           path: rt-out
+
+  # One cross-platform bundle per the VST3 spec: the three platform builds
+  # overlay cleanly because each contributes its own Contents/<arch>/ dir
+  # (plus Info.plist/PkgInfo from macOS); Resources/ is identical everywhere.
+  merge:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download platform bundles
+        uses: actions/download-artifact@v4
+        with:
+          pattern: VapeStation-*-vst3
+          merge-multiple: true
+          path: VapeStation.vst3
+
+      - name: Verify merged layout
+        run: |
+          test -f "VapeStation.vst3/Contents/x86_64-win/VapeStation.vst3"
+          test -f "VapeStation.vst3/Contents/x86_64-linux/VapeStation.so"
+          test -f "VapeStation.vst3/Contents/MacOS/VapeStation"
+          test -f "VapeStation.vst3/Contents/Info.plist"
+          find VapeStation.vst3 -type f | sort
+
+      # Tar (not zip) so the macOS binary keeps its executable bit.
+      - name: Pack
+        run: |
+          chmod +x VapeStation.vst3/Contents/MacOS/VapeStation
+          tar czf VapeStation-all-platforms.vst3.tar.gz VapeStation.vst3
+
+      - name: Upload merged bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: VapeStation-all-platforms-vst3
+          path: VapeStation-all-platforms.vst3.tar.gz
