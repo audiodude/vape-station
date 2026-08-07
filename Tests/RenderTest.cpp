@@ -162,7 +162,7 @@ int main (int argc, char** argv)
         const auto t0 = juce::Time::getMillisecondCounterHiRes();
         const auto& tables = grainTables();
         const auto ms = juce::Time::getMillisecondCounterHiRes() - t0;
-        check (tables.size() == 5, "graintables built", juce::String (ms, 1) + " ms");
+        check (tables.size() == 10, "graintables built", juce::String (ms, 1) + " ms");
     }
 
     // T1: no notes -> true silence

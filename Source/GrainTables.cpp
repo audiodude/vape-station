@@ -138,6 +138,149 @@ Spectrum specGrit (float x)
     return s;
 }
 
+Spectrum specPulse (float x)
+{
+    // Pulse-width sweep. A rectangular pulse is a saw minus the same saw
+    // phase-shifted by the duty cycle, which gives both a sine and a cosine
+    // term per harmonic. 50% (square) at the left of the table, 4% at the right.
+    const double phi = juce::MathConstants<double>::twoPi * (0.5 - 0.46 * (double) x);
+
+    Spectrum s {};
+    for (int n = 1; n <= kMaxHarm; ++n)
+    {
+        const double sinPart = (1.0 - std::cos (phi * n)) / n;
+        const double cosPart = std::sin (phi * n) / n;
+        s[(size_t) n] = { (float) sinPart, (float) cosPart };
+    }
+    return s;
+}
+
+// Bessel function of the first kind, integer order, by the ascending series.
+// Build-time only and z stays under 10, so 40 terms is far past convergence.
+double besselJ (int k, double z)
+{
+    double term = 1.0;                       // becomes (z/2)^k / k!
+    for (int j = 1; j <= k; ++j)
+        term *= 0.5 * z / (double) j;
+
+    double sum = term;
+    const double quarterZ2 = 0.25 * z * z;
+    for (int m = 1; m <= 40; ++m)
+    {
+        term *= -quarterZ2 / ((double) m * (double) (m + k));
+        sum += term;
+    }
+    return sum;
+}
+
+Spectrum specFm (float x)
+{
+    // Two-operator FM at a 1:1 ratio, modulation index sweeping 0 -> 9:
+    // sin(t + I sin t) = sum_k J_k(I) sin((1+k)t). Sidebands that land below
+    // DC fold back onto harmonic n with a sign flip.
+    const double index = 9.0 * (double) x;
+
+    Spectrum s {};
+    for (int n = 1; n <= kMaxHarm; ++n)
+    {
+        const double fold = (n % 2 == 0) ? 1.0 : -1.0;
+        s[(size_t) n] = { (float) (besselJ (n - 1, index) + fold * besselJ (n + 1, index)), 0.0f };
+    }
+    return s;
+}
+
+Spectrum specOrgan (float x)
+{
+    // Drawbar registration: partials pull in one at a time as x rises, from a
+    // bare sine to a full stack. The 3rd and 5th are what make it read "organ".
+    static constexpr int   drawbars[7] = { 1, 2, 3, 4, 5, 6, 8 };
+    static constexpr float levels[7]   = { 1.0f, 0.7f, 0.55f, 0.5f, 0.4f, 0.36f, 0.3f };
+
+    Spectrum s {};
+    for (int k = 0; k < 7; ++k)
+    {
+        const float pull = juce::jlimit (0.0f, 1.0f, x * 6.5f - (float) k + 1.0f);
+        s[(size_t) drawbars[k]] += std::complex<float> (levels[k] * pull, 0.0f);
+    }
+    return s;
+}
+
+Spectrum specFold (float x)
+{
+    // Wavefolder: a sine driven into a triangle folder, drive 1 -> 8. The
+    // folded shape has no closed-form spectrum, so analyse one cycle directly.
+    // fold() is odd and half-wave symmetric, so only odd harmonics survive.
+    constexpr int N = GrainTable::frameLen;
+
+    static const auto sinTab = []
+    {
+        std::array<double, N> t {};
+        for (int i = 0; i < N; ++i)
+            t[(size_t) i] = std::sin (juce::MathConstants<double>::twoPi * i / N);
+        return t;
+    }();
+
+    const double drive = 1.0 + 7.0 * (double) x;
+
+    std::array<double, N> wave {};
+    for (int i = 0; i < N; ++i)
+    {
+        const double driven = drive * sinTab[(size_t) i] * juce::MathConstants<double>::halfPi;
+        wave[(size_t) i] = std::asin (std::sin (driven)) / juce::MathConstants<double>::halfPi;
+    }
+
+    Spectrum s {};
+    for (int n = 1; n <= kMaxHarm; ++n)
+    {
+        double acc = 0.0;
+        for (int i = 0; i < N; ++i)
+            acc += wave[(size_t) i] * sinTab[(size_t) ((n * i) % N)];
+        s[(size_t) n] = { (float) (2.0 * acc / N), 0.0f };
+    }
+    return s;
+}
+
+Spectrum specMouth (float x)
+{
+    // A talkbox glide where Vox is a vowel hop. Two differences: the formant
+    // *frequencies* are interpolated (peaks slide continuously instead of one
+    // vowel's spectrum crossfading into the next), and they run in acoustic
+    // order oo-oh-ah-eh-ee. Narrower bands than Vox plus a nasal notch that
+    // opens up as the mouth does. Assumed f0 = 110 Hz.
+    static constexpr float f1[5] = {  300.0f,  570.0f,  730.0f,  530.0f,  270.0f };
+    static constexpr float f2[5] = {  870.0f,  840.0f, 1090.0f, 1840.0f, 2290.0f };
+    static constexpr float f3[5] = { 2240.0f, 2410.0f, 2440.0f, 2480.0f, 3010.0f };
+    static constexpr float weights[4] = { 1.0f, 0.8f, 0.5f, 0.22f };
+
+    const float v = x * 4.0f;
+    const int v0 = juce::jlimit (0, 4, (int) v);
+    const int v1 = juce::jmin (4, v0 + 1);
+    const float vf = v - (float) v0;
+
+    const float centres[4] = { lerp (f1[(size_t) v0], f1[(size_t) v1], vf),
+                               lerp (f2[(size_t) v0], f2[(size_t) v1], vf),
+                               lerp (f3[(size_t) v0], f3[(size_t) v1], vf),
+                               3300.0f }; // fixed singer's formant for presence
+    const float nasal = juce::jmax (0.0f, 1.0f - 2.0f * x);
+
+    Spectrum s {};
+    for (int n = 1; n <= kMaxHarm; ++n)
+    {
+        const float freq = 110.0f * (float) n;
+        float a = 0.0f;
+        for (int k = 0; k < 4; ++k)
+        {
+            const float bw = 0.055f * centres[k] + 30.0f;
+            const float d = (freq - centres[k]) / bw;
+            a += weights[k] * std::exp (-0.5f * d * d);
+        }
+        const float dz = (freq - 1000.0f) / 300.0f;
+        a *= 1.0f - 0.8f * nasal * std::exp (-0.5f * dz * dz); // nasal anti-formant
+        s[(size_t) n] = { a + 0.03f / (float) n, 0.0f };
+    }
+    return s;
+}
+
 void buildTable (GrainTable& t, Spectrum (*gen) (float))
 {
     juce::dsp::FFT fft (11); // 2048
@@ -192,12 +335,19 @@ const std::vector<GrainTable>& grainTables()
 {
     static const std::vector<GrainTable> tables = []
     {
-        std::vector<GrainTable> v (5);
+        // Append-only: the table parameter stores an index, so reordering
+        // this list would repoint every saved patch at a different table.
+        std::vector<GrainTable> v (10);
         v[0].name = "Morph"; buildTable (v[0], specMorph);
         v[1].name = "Sweep"; buildTable (v[1], specSweep);
         v[2].name = "Vox";   buildTable (v[2], specVox);
         v[3].name = "Bells"; buildTable (v[3], specBells);
         v[4].name = "Grit";  buildTable (v[4], specGrit);
+        v[5].name = "Pulse"; buildTable (v[5], specPulse);
+        v[6].name = "FM";    buildTable (v[6], specFm);
+        v[7].name = "Fold";  buildTable (v[7], specFold);
+        v[8].name = "Organ"; buildTable (v[8], specOrgan);
+        v[9].name = "Mouth"; buildTable (v[9], specMouth);
         return v;
     }();
     return tables;

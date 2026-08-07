@@ -17,7 +17,9 @@ export const SRCS = ['ENV1', 'ENV2', 'ENV3', 'LFO1', 'LFO2', 'VEL', 'WHEEL', 'KE
 export const S = Object.fromEntries(SRCS.map((n, i) => [n, i]));
 export const isBipolarSrc = (s) => s === S.LFO1 || s === S.LFO2 || s === S.KEY;
 
-export const TABLES = ['Morph', 'Sweep', 'Vox', 'Bells', 'Grit'];
+// Append-only: `table` is stored as an index, in patches and in localStorage.
+export const TABLES = ['Morph', 'Sweep', 'Vox', 'Bells', 'Grit',
+                       'Pulse', 'FM', 'Fold', 'Organ', 'Mouth'];
 export const FILTER_TYPES = ['Low Pass', 'Band Pass', 'High Pass'];
 export const LFO_SHAPES = ['Sine', 'Triangle', 'Saw Up', 'Saw Down', 'Square', 'S&H'];
 export const LFO_MODES = ['Retrig', 'First Note', 'Global'];

@@ -145,6 +145,107 @@ function specGrit(x) {
   return { re, im };
 }
 
+function specPulse(x) {
+  const re = new Float64Array(MAX_HARM + 1), im = new Float64Array(MAX_HARM + 1);
+  const phi = 2 * Math.PI * (0.5 - 0.46 * x);
+  for (let n = 1; n <= MAX_HARM; n++) {
+    re[n] = (1 - Math.cos(phi * n)) / n;
+    im[n] = Math.sin(phi * n) / n;
+  }
+  return { re, im };
+}
+
+// Bessel function of the first kind, integer order, by the ascending series.
+// Build-time only and z stays under 10, so 40 terms is far past convergence.
+function besselJ(k, z) {
+  let term = 1; // becomes (z/2)^k / k!
+  for (let j = 1; j <= k; j++) term *= (0.5 * z) / j;
+  let sum = term;
+  const quarterZ2 = 0.25 * z * z;
+  for (let m = 1; m <= 40; m++) {
+    term *= -quarterZ2 / (m * (m + k));
+    sum += term;
+  }
+  return sum;
+}
+
+function specFm(x) {
+  const re = new Float64Array(MAX_HARM + 1), im = new Float64Array(MAX_HARM + 1);
+  const index = 9 * x;
+  for (let n = 1; n <= MAX_HARM; n++) {
+    const fold = n % 2 === 0 ? 1 : -1;
+    re[n] = besselJ(n - 1, index) + fold * besselJ(n + 1, index);
+  }
+  return { re, im };
+}
+
+const DRAWBARS = [1, 2, 3, 4, 5, 6, 8];
+const DRAWBAR_LEVELS = [1, 0.7, 0.55, 0.5, 0.4, 0.36, 0.3];
+
+function specOrgan(x) {
+  const re = new Float64Array(MAX_HARM + 1), im = new Float64Array(MAX_HARM + 1);
+  for (let k = 0; k < DRAWBARS.length; k++) {
+    const pull = Math.min(1, Math.max(0, x * 6.5 - k + 1));
+    re[DRAWBARS[k]] += DRAWBAR_LEVELS[k] * pull;
+  }
+  return { re, im };
+}
+
+const foldSinTab = (() => {
+  const t = new Float64Array(FRAME_LEN);
+  for (let i = 0; i < FRAME_LEN; i++) t[i] = Math.sin((2 * Math.PI * i) / FRAME_LEN);
+  return t;
+})();
+
+function specFold(x) {
+  const re = new Float64Array(MAX_HARM + 1), im = new Float64Array(MAX_HARM + 1);
+  const drive = 1 + 7 * x;
+  const wave = new Float64Array(FRAME_LEN);
+  for (let i = 0; i < FRAME_LEN; i++) {
+    const driven = drive * foldSinTab[i] * (Math.PI / 2);
+    wave[i] = Math.asin(Math.sin(driven)) / (Math.PI / 2);
+  }
+  for (let n = 1; n <= MAX_HARM; n++) {
+    let acc = 0;
+    for (let i = 0; i < FRAME_LEN; i++) acc += wave[i] * foldSinTab[(n * i) % FRAME_LEN];
+    re[n] = (2 * acc) / FRAME_LEN;
+  }
+  return { re, im };
+}
+
+const MOUTH_F1 = [300, 570, 730, 530, 270];
+const MOUTH_F2 = [870, 840, 1090, 1840, 2290];
+const MOUTH_F3 = [2240, 2410, 2440, 2480, 3010];
+const MOUTH_W = [1, 0.8, 0.5, 0.22];
+
+function specMouth(x) {
+  const re = new Float64Array(MAX_HARM + 1), im = new Float64Array(MAX_HARM + 1);
+  const v = x * 4;
+  const v0 = Math.min(4, Math.max(0, Math.floor(v)));
+  const v1 = Math.min(4, v0 + 1);
+  const vf = v - v0;
+  const centres = [
+    lerp(MOUTH_F1[v0], MOUTH_F1[v1], vf),
+    lerp(MOUTH_F2[v0], MOUTH_F2[v1], vf),
+    lerp(MOUTH_F3[v0], MOUTH_F3[v1], vf),
+    3300, // fixed singer's formant for presence
+  ];
+  const nasal = Math.max(0, 1 - 2 * x);
+  for (let n = 1; n <= MAX_HARM; n++) {
+    const freq = 110 * n;
+    let a = 0;
+    for (let k = 0; k < 4; k++) {
+      const bw = 0.055 * centres[k] + 30;
+      const d = (freq - centres[k]) / bw;
+      a += MOUTH_W[k] * Math.exp(-0.5 * d * d);
+    }
+    const dz = (freq - 1000) / 300;
+    a *= 1 - 0.8 * nasal * Math.exp(-0.5 * dz * dz); // nasal anti-formant
+    re[n] = a + 0.03 / n;
+  }
+  return { re, im };
+}
+
 function buildTable(gen) {
   const N = FRAME_LEN;
   const mips = MIP_CAPS.map(() => new Float32Array(NUM_FRAMES * (N + 1)));
@@ -191,6 +292,11 @@ export function grainTables() {
       { name: 'Vox',   mips: buildTable(specVox) },
       { name: 'Bells', mips: buildTable(specBells) },
       { name: 'Grit',  mips: buildTable(specGrit) },
+      { name: 'Pulse', mips: buildTable(specPulse) },
+      { name: 'FM',    mips: buildTable(specFm) },
+      { name: 'Fold',  mips: buildTable(specFold) },
+      { name: 'Organ', mips: buildTable(specOrgan) },
+      { name: 'Mouth', mips: buildTable(specMouth) },
     ];
   }
   return tablesCache;

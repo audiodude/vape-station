@@ -9,9 +9,10 @@ an envelope or LFO straight onto it.
 VapeStation plays clouds of pitch-tracked grains from morphing wavetable
 frame-stacks. Sweep **Position** to morph through a table's 64 frames like a
 wavetable synth. Use **Spray**, **Pitch Rnd**, and **Density** and the
-same patch dissolves into granular haze, shimmer, or grit. Five built-in
-tables (**Morph, Sweep, Vox, Bells, Grit**) cover smooth analog-ish morphs,
-vocal formants, inharmonic bell spectra, and raw noise-bitten textures.
+same patch dissolves into granular haze, shimmer, or grit. Ten built-in
+tables cover smooth analog-ish morphs and PWM, vocal formants and talkbox
+glides, inharmonic bell spectra, FM and wavefolder clang, drawbar organ
+stacks, and raw noise-bitten textures.
 
 ## Why you'll like it
 
@@ -68,10 +69,31 @@ Install by dropping `VapeStation.vst3` into your VST3 folder:
 
 ## VapeStation: Detailed specs
 
-**Graintable engine** — five built-in tables (Morph, Sweep, Vox, Bells, Grit),
-each 64 single-cycle frames generated procedurally at startup and band-limited
-into 4 mip levels. Each voice schedules overlapping Hann-windowed grains that
-read from the table at the note's pitch:
+**Graintable engine** — ten built-in tables, each 64 single-cycle frames
+generated procedurally at startup (additive spectra → iFFT) and band-limited
+into 4 mip levels. Position scans through a table's frames, so every table is
+its own one-knob timbre sweep:
+
+| Table | Position sweeps |
+|---|---|
+| **Morph** | saw → square → triangle |
+| **Sweep** | a resonant band climbing the harmonic series |
+| **Vox** | vowel formants, crossfading A–E–I–O–U |
+| **Bells** | sparse inharmonic partials, bright strike → dark hum |
+| **Grit** | two fixed random spectra with random phases, crossfaded |
+| **Pulse** | pulse width, 50% (square) → 4% (thin and buzzy) |
+| **FM** | 2-operator FM at a 1:1 ratio, modulation index 0 → 9 |
+| **Fold** | a sine driven into a triangle wavefolder, drive 1 → 8 |
+| **Organ** | drawbars pulling in one at a time, bare sine → full stack |
+| **Mouth** | a talkbox glide — formants sliding oo → oh → ah → eh → ee |
+
+Vox and Mouth are both formant tables but behave differently: Vox crossfades
+between five static vowel spectra, while Mouth interpolates the formant
+*frequencies*, so its peaks slide continuously (with narrower bands and a
+nasal notch that opens up as the sweep does).
+
+Each voice schedules overlapping Hann-windowed grains that read from the
+table at the note's pitch:
 
 - **Position** — scan position through the table's frames (the main timbre control)
 - **Size / Density** — grain length (10-500 ms) and overlap count (1-8)

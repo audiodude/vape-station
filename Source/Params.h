@@ -69,7 +69,9 @@ inline juce::String destDisplayName (int d)
 
 inline const juce::StringArray& tableNames()
 {
-    static const juce::StringArray s { "Morph", "Sweep", "Vox", "Bells", "Grit" };
+    // Append-only: the `table` parameter stores an index into this list.
+    static const juce::StringArray s { "Morph", "Sweep", "Vox", "Bells", "Grit",
+                                       "Pulse", "FM", "Fold", "Organ", "Mouth" };
     return s;
 }
 

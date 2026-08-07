@@ -52,7 +52,7 @@ const relDiff = (a, b) => {
   const t0 = Date.now();
   const tables = grainTables();
   const ms = Date.now() - t0;
-  let ok = tables.length === 5;
+  let ok = tables.length === 10;
   for (const t of tables) {
     let maxAbs = 0;
     for (let i = 0; i < 2049; i++) maxAbs = Math.max(maxAbs, Math.abs(t.mips[0][i]));
