@@ -210,15 +210,18 @@ Spectrum specFold (float x)
     // Wavefolder: a sine driven into a triangle folder, drive 1 -> 8. The
     // folded shape has no closed-form spectrum, so analyse one cycle directly.
     // fold() is odd and half-wave symmetric, so only odd harmonics survive.
-    constexpr int N = GrainTable::frameLen;
-
+    // Spelled out rather than via a local constant: MSVC treats a local
+    // constexpr as needing capture inside the lambda, even though it is only
+    // used in constant expressions (C3493).
     static const auto sinTab = []
     {
-        std::array<double, N> t {};
-        for (int i = 0; i < N; ++i)
-            t[(size_t) i] = std::sin (juce::MathConstants<double>::twoPi * i / N);
+        std::array<double, GrainTable::frameLen> t {};
+        for (int i = 0; i < GrainTable::frameLen; ++i)
+            t[(size_t) i] = std::sin (juce::MathConstants<double>::twoPi * i / GrainTable::frameLen);
         return t;
     }();
+
+    constexpr int N = GrainTable::frameLen;
 
     const double drive = 1.0 + 7.0 * (double) x;
 
