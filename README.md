@@ -23,6 +23,9 @@ stacks, and raw noise-bitten textures.
 - **See your modulation.** Modulated knobs grow coloured halo rings showing
   each route's span, with a white dot riding the live modulated value. A
   matrix panel lists every route with a bipolar depth slider.
+- **A filter worth sweeping.** Eight modes per voice — 12 and 24 dB/oct low
+  and high pass, band pass, notch, peak, and a 4-pole Moog ladder that
+  self-oscillates when you push Res to the top.
 - **Play it like an instrument.** 10 voices, sustain pedal, pitch bend, and
   per-LFO **Retrig / First Note / Global** modes so modulation can lock to
   every note, to your phrasing, or run free across the whole performance.
@@ -102,8 +105,32 @@ table at the note's pitch:
 - **Shape** — grain window skew
 - **Coarse / Fine / Spread** — transpose, detune cents, stereo grain panning
 
-Per voice: state-variable filter (LP/BP/HP), ADSR amp envelope. 10 voices,
+Per voice: ADSR amp envelope and a filter with eight modes. 10 voices,
 sustain pedal and pitch bend (±2 st) supported.
+
+**Filter** — seven modes come off one zero-delay state-variable core, which
+computes every output from the same pair of integrator states, so notch
+(LP+HP) and peak (LP−HP) are free and the 24 dB/oct modes just run the core
+twice:
+
+| Mode | |
+|---|---|
+| **Low Pass / Band Pass / High Pass** | 12 dB/oct, the classic three |
+| **Notch** | full null at cutoff; resonance narrows it rather than boosting |
+| **Peak** | a boost at cutoff, flat either side — a sweepable EQ bell |
+| **Low Pass 24 / High Pass 24** | 24 dB/oct, twice the slope and twice the resonant peak |
+| **Ladder** | 4-pole zero-delay Moog with a saturator in its feedback path |
+
+The **Ladder** is the one with character. Its saturation sits in the feedback
+rather than the forward path, so the passband stays clean while the clipper
+bounds the resonance, and it self-oscillates — hold a note with Res at max
+and it sings at the cutoff on its own. Like the real thing it thins out as
+resonance climbs (a ladder's DC gain is 1/(1+k)), so the input is scaled to
+claw most of that back.
+
+Measured by the test harnesses: 12 dB/oct modes hit −24.1 dB two octaves
+above cutoff, the 24 dB/oct modes −48.2 dB, notch nulls to −180 dB, and peak
+boosts +26 dB at full resonance.
 
 Knob gestures snap to a musically spaced step grid (~5-10% "nice number"
 increments for times/rates/cutoff, 0.5 ms floor on envelope times, whole
