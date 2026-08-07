@@ -61,8 +61,8 @@ void GrainVoice::prepare (double sampleRate, int maxBlockSize)
     env2.setSampleRate (sr);
     env3.setSampleRate (sr);
 
-    juce::dsp::ProcessSpec spec { sr, (juce::uint32) maxBlockSize, 2 };
-    filter.prepare (spec);
+    juce::ignoreUnused (maxBlockSize);
+    filter.prepare (sr);
 
     cutoffSm.reset (sr / subBlock, 0.02);
     gainSm.reset (sr, 0.005);
@@ -171,15 +171,8 @@ void GrainVoice::updateControls (const GrainTable&, const CompiledMatrix* mat, i
     grainNorm = juce::jmin (1.0f, 2.0f / density);
     curGamma = std::exp2 ((eff[dShape] - 0.5f) * 3.0f);
 
-    switch (proc.filterTypeIndex())
-    {
-        case 1:  filter.setType (juce::dsp::StateVariableTPTFilterType::bandpass); break;
-        case 2:  filter.setType (juce::dsp::StateVariableTPTFilterType::highpass); break;
-        default: filter.setType (juce::dsp::StateVariableTPTFilterType::lowpass);  break;
-    }
     cutoffSm.setTargetValue (juce::jlimit (20.0f, (float) (0.45 * sr), eff[dCutoff]));
-    filter.setCutoffFrequency (cutoffSm.getNextValue());
-    filter.setResonance (0.707f * std::pow (10.0f, eff[dRes] * 1.15f));
+    filter.set (cutoffSm.getNextValue(), eff[dRes], proc.filterTypeIndex());
 
     gainSm.setTargetValue (juce::Decibels::decibelsToGain (eff[dGain]));
 }
@@ -263,9 +256,9 @@ void GrainVoice::renderNextBlock (juce::AudioBuffer<float>& out, int startSample
             const float amp = env1Last * gainSm.getNextValue() * grainNorm;
             l *= amp;
             r *= amp;
-            l = filter.processSample (0, l);
+            l = filter.process (0, l);
             if (R != nullptr)
-                r = filter.processSample (1, r);
+                r = filter.process (1, r);
 
             L[s] += l;
             if (R != nullptr)

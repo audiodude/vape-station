@@ -20,7 +20,10 @@ export const isBipolarSrc = (s) => s === S.LFO1 || s === S.LFO2 || s === S.KEY;
 // Append-only: `table` is stored as an index, in patches and in localStorage.
 export const TABLES = ['Morph', 'Sweep', 'Vox', 'Bells', 'Grit',
                        'Pulse', 'FM', 'Fold', 'Organ', 'Mouth'];
-export const FILTER_TYPES = ['Low Pass', 'Band Pass', 'High Pass'];
+// Append-only: `filterType` is stored as an index, and must stay in step with
+// FilterType in Source/Filter.h.
+export const FILTER_TYPES = ['Low Pass', 'Band Pass', 'High Pass', 'Notch',
+                             'Peak', 'Low Pass 24', 'High Pass 24', 'Ladder'];
 export const LFO_SHAPES = ['Sine', 'Triangle', 'Saw Up', 'Saw Down', 'Square', 'S&H'];
 export const LFO_MODES = ['Retrig', 'First Note', 'Global'];
 

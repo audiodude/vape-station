@@ -77,7 +77,10 @@ inline const juce::StringArray& tableNames()
 
 inline const juce::StringArray& filterTypeNames()
 {
-    static const juce::StringArray s { "Low Pass", "Band Pass", "High Pass" };
+    // Append-only, and must stay in step with FilterType in Filter.h.
+    static const juce::StringArray s { "Low Pass", "Band Pass", "High Pass",
+                                       "Notch", "Peak", "Low Pass 24",
+                                       "High Pass 24", "Ladder" };
     return s;
 }
 

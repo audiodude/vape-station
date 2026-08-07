@@ -409,29 +409,101 @@ class Lfo {
   }
 }
 
-// TPT state-variable filter (equivalent to juce::dsp::StateVariableTPTFilter).
-class Svf {
-  constructor() { this.ic1 = [0, 0]; this.ic2 = [0, 0]; this.g = 0.1; this.k = 1 / 0.707; this.type = 0; }
-  reset() { this.ic1 = [0, 0]; this.ic2 = [0, 0]; }
-  set(cutoff, resonance, type, sr) {
-    this.g = Math.tan(Math.PI * Math.min(0.49 * sr, cutoff) / sr);
-    this.k = 1 / Math.max(0.05, resonance);
+// Filter types — append-only, and must stay in step with FilterType in
+// Source/Filter.h.
+export const FT_LP = 0, FT_BP = 1, FT_HP = 2, FT_NOTCH = 3, FT_PEAK = 4,
+             FT_LP24 = 5, FT_HP24 = 6, FT_LADDER = 7;
+
+const LADDER_HEADROOM = 0.5; // where the ladder's feedback clipper bites
+
+// Port of vape::VapeFilter (Source/Filter.h) — keep the two in step.
+//
+// Types 0-6 run a TPT state-variable core (Zavalishin). Every output falls out
+// of the same pair of integrator states, so notch and peak cost nothing beyond
+// a different combination, and the 24 dB/oct types just run the core twice.
+//
+// Type 7 is a 4-pole zero-delay Moog ladder. The soft clipper sits inside the
+// feedback path, which is what lets it self-oscillate and stay bounded rather
+// than merely ring: a linear filter can only decay.
+export class VapeFilter {
+  constructor() {
+    this.ic1 = [[0, 0], [0, 0]]; // [channel][stage]
+    this.ic2 = [[0, 0], [0, 0]];
+    this.ladderZ = [[0, 0, 0, 0], [0, 0, 0, 0]];
+    this.g = 0.1; this.k = 1 / 0.707; this.G = 0; this.G4 = 0; this.type = FT_LP;
+  }
+  reset() {
+    this.ic1 = [[0, 0], [0, 0]];
+    this.ic2 = [[0, 0], [0, 0]];
+    this.ladderZ = [[0, 0, 0, 0], [0, 0, 0, 0]];
+  }
+  set(cutoff, res01, type, sr) {
     this.type = type;
+    const fc = Math.min(0.49 * sr, Math.max(20, cutoff));
+    this.g = Math.tan((Math.PI * fc) / sr);
+    if (type === FT_LADDER) {
+      this.G = this.g / (1 + this.g);
+      const g2 = this.G * this.G;
+      this.G4 = g2 * g2;
+      this.k = 4.5 * res01; // 4 is the threshold; the extra pushes it over
+    } else {
+      // Unchanged from the original single-mode filter, so existing sessions
+      // keep the resonance response they were dialled in with.
+      const q = 0.707 * Math.pow(10, res01 * 1.15);
+      this.k = 1 / Math.max(0.05, q);
+    }
   }
   process(ch, x) {
+    if (this.type === FT_LADDER) return this.processLadder(ch, x);
+    const y = this.processSvf(ch, 0, x);
+    if (this.type === FT_LP24 || this.type === FT_HP24) return this.processSvf(ch, 1, y);
+    return y;
+  }
+  processSvf(ch, stage, x) {
     const g = this.g, k = this.k;
     const a1 = 1 / (1 + g * (g + k));
     const a2 = g * a1;
-    const v3 = x - this.ic2[ch];
-    const v1 = a1 * this.ic1[ch] + a2 * v3;
-    const v2 = this.ic2[ch] + a2 * this.ic1[ch] + g * a2 * v3;
-    this.ic1[ch] = 2 * v1 - this.ic1[ch];
-    this.ic2[ch] = 2 * v2 - this.ic2[ch];
+    const v3 = x - this.ic2[ch][stage];
+    const v1 = a1 * this.ic1[ch][stage] + a2 * v3;
+    const v2 = this.ic2[ch][stage] + a2 * this.ic1[ch][stage] + g * a2 * v3;
+    this.ic1[ch][stage] = 2 * v1 - this.ic1[ch][stage];
+    this.ic2[ch][stage] = 2 * v2 - this.ic2[ch][stage];
     switch (this.type) {
-      case 1: return v1;                    // BP
-      case 2: return x - k * v1 - v2;       // HP
-      default: return v2;                   // LP
+      case FT_BP: return v1;
+      case FT_HP:
+      case FT_HP24: return x - k * v1 - v2;
+      case FT_NOTCH: return x - k * v1;             // LP + HP
+      case FT_PEAK: return 2 * v2 - x + k * v1;     // LP - HP
+      default: return v2;                            // LP, LP24
     }
+  }
+  processLadder(ch, x) {
+    // Each one-pole answers y = G*in + (1-G)*z, so the 4-pole output is
+    // G^4*u + S with S the weighted sum of the four states. Solving
+    // u = x - k*y4 for u resolves the feedback without a unit delay.
+    const z = this.ladderZ[ch], G = this.G, k = this.k;
+    const m = 1 - G;
+    const S = ((m * z[0] * G + m * z[1]) * G + m * z[2]) * G + m * z[3];
+
+    // Saturate the feedback, not the forward path. Clipping the forward path
+    // costs passband level and chokes the loop gain the resonance needs;
+    // clipping only the feedback keeps the passband clean and still bounds the
+    // oscillation that k > 4 would otherwise grow without limit.
+    const sn = S / LADDER_HEADROOM;
+    const sat = sn / (1 + Math.abs(sn));
+
+    // A ladder's DC gain is 1/(1+k), so it thins out as resonance rises.
+    // Scaling the input claws most of that back without flattening the
+    // character entirely, and drives the saturator harder as a bonus.
+    let u = (x * (1 + 0.5 * k) - k * LADDER_HEADROOM * sat) / (1 + k * this.G4);
+
+    for (let p = 0; p < 4; p++) {
+      const d = (u - z[p]) * G;
+      const y = d + z[p];
+      z[p] = y + d;
+      u = y;
+    }
+    return u;
   }
 }
 
@@ -455,7 +527,7 @@ class Voice {
     }));
     this.eff = new Float32Array(NUM_DESTS);
     this.effNorm = new Float32Array(NUM_DESTS);
-    this.filter = new Svf();
+    this.filter = new VapeFilter();
     this.rngState = 1;
     this.noteSeq = 0;
     this.reset();
@@ -562,7 +634,7 @@ class Voice {
     this.curGamma = Math.pow(2, (eff[D.shape] - 0.5) * 3);
 
     this.filter.set(Math.min(0.45 * this.sr, Math.max(20, eff[D.cutoff])),
-                    0.707 * Math.pow(10, eff[D.res] * 1.15), e.filterType, this.sr);
+                    eff[D.res], e.filterType, this.sr);
     this.gainTarget = Math.pow(10, eff[D.gain] / 20);
   }
 

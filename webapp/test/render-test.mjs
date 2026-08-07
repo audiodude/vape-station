@@ -1,7 +1,7 @@
 // Offline verification for the web engine, mirroring Tests/RenderTest.cpp.
 // Run: node webapp/test/render-test.mjs   (exit code = failed checks)
 
-import { Engine, grainTables } from '../js/engine.js';
+import { Engine, grainTables, VapeFilter } from '../js/engine.js';
 import { D, S, PARAMS } from '../js/params.js';
 
 const SR = 48000;
@@ -59,6 +59,41 @@ const relDiff = (a, b) => {
     ok = ok && maxAbs > 0.01 && maxAbs < 4;
   }
   check(ok, 'graintables built', `${ms} ms`);
+}
+
+// T0b: filter modes — slopes, notch depth, and a ladder that sings
+{
+  const respDb = (type, res, freq) => {
+    const f = new VapeFilter();
+    f.set(1000, res, type, SR);
+    const n = SR, skip = SR * 0.3;
+    let sum = 0;
+    for (let i = 0; i < n; i++) {
+      const y = f.process(0, 0.2 * Math.sin((2 * Math.PI * freq * i) / SR));
+      if (i > skip) sum += y * y;
+    }
+    return 20 * Math.log10(Math.max(1e-9, Math.sqrt(sum / (n - skip)) / (0.2 * 0.70710678)));
+  };
+
+  // Two octaves above cutoff: 12 dB/oct lands near -24, 24 dB/oct near -48.
+  const lp12 = respDb(0, 0.2, 4000), lp24 = respDb(5, 0.2, 4000);
+  check(lp12 < -20 && lp12 > -28, 'low pass is 12 dB/oct', `${lp12.toFixed(1)} dB at 4x fc`);
+  check(lp24 < -44 && lp24 > -52, 'low pass 24 is 24 dB/oct', `${lp24.toFixed(1)} dB at 4x fc`);
+  check(respDb(6, 0.2, 125) < -60, 'high pass 24 is 24 dB/oct');
+  check(respDb(3, 0.2, 1000) < -40, 'notch nulls at cutoff');
+  check(respDb(4, 1.0, 1000) > 15, 'peak boosts at cutoff');
+  check(respDb(7, 0.2, 125) > -4, 'ladder passband stays near unity');
+
+  // Kick it once, then feed silence: it should still be going, and bounded.
+  const lad = new VapeFilter();
+  lad.set(1000, 1.0, 7, SR);
+  lad.process(0, 1.0);
+  let peak = 0;
+  for (let i = 0; i < SR * 3; i++) {
+    const y = lad.process(0, 0);
+    if (i > SR * 2) peak = Math.max(peak, Math.abs(y));
+  }
+  check(peak > 0.01 && peak < 1.0, 'ladder self-oscillates, bounded', `peak=${peak.toFixed(4)}`);
 }
 
 // T1: silence without notes

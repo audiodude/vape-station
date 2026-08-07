@@ -165,6 +165,51 @@ int main (int argc, char** argv)
         check (tables.size() == 10, "graintables built", juce::String (ms, 1) + " ms");
     }
 
+    // T0b: filter modes — slopes, notch depth, and a ladder that sings
+    {
+        auto respDb = [] (int type, float res, float freq)
+        {
+            VapeFilter f;
+            f.prepare (kSR);
+            f.set (1000.0f, res, type);
+            const int n = (int) kSR, skip = (int) (kSR * 0.3);
+            double sum = 0.0;
+            for (int i = 0; i < n; ++i)
+            {
+                const float x = 0.2f * std::sin (juce::MathConstants<float>::twoPi * freq * (float) i / (float) kSR);
+                const float y = f.process (0, x);
+                if (i > skip)
+                    sum += (double) y * y;
+            }
+            const double rms = std::sqrt (sum / (n - skip));
+            return 20.0 * std::log10 (std::max (1.0e-9, rms / (0.2 * 0.70710678)));
+        };
+
+        // Two octaves above cutoff: 12 dB/oct lands near -24, 24 dB/oct near -48.
+        const double lp12 = respDb (ftLowPass, 0.2f, 4000.0f);
+        const double lp24 = respDb (ftLowPass24, 0.2f, 4000.0f);
+        check (lp12 < -20.0 && lp12 > -28.0, "low pass is 12 dB/oct", juce::String (lp12, 1) + " dB at 4x fc");
+        check (lp24 < -44.0 && lp24 > -52.0, "low pass 24 is 24 dB/oct", juce::String (lp24, 1) + " dB at 4x fc");
+        check (respDb (ftHighPass24, 0.2f, 125.0f) < -60.0, "high pass 24 is 24 dB/oct");
+        check (respDb (ftNotch, 0.2f, 1000.0f) < -40.0, "notch nulls at cutoff");
+        check (respDb (ftPeak, 1.0f, 1000.0f) > 15.0, "peak boosts at cutoff");
+        check (respDb (ftLadder, 0.2f, 125.0f) > -4.0, "ladder passband stays near unity");
+
+        // Kick it once, then feed silence: it should still be going, and bounded.
+        VapeFilter lad;
+        lad.prepare (kSR);
+        lad.set (1000.0f, 1.0f, ftLadder);
+        lad.process (0, 1.0f);
+        float peak = 0.0f;
+        for (int i = 0; i < (int) (kSR * 3); ++i)
+        {
+            const float y = lad.process (0, 0.0f);
+            if (i > (int) (kSR * 2))
+                peak = juce::jmax (peak, std::abs (y));
+        }
+        check (peak > 0.01f && peak < 1.0f, "ladder self-oscillates, bounded", "peak=" + juce::String (peak, 4));
+    }
+
     // T1: no notes -> true silence
     {
         VapeProcessor p;

@@ -5,6 +5,7 @@
 #include "Params.h"
 #include "ModMatrix.h"
 #include "GrainTables.h"
+#include "Filter.h"
 #include "Lfo.h"
 #include <array>
 
@@ -64,7 +65,7 @@ private:
     float env1Last = 0.0f, env2Last = 0.0f, env3Last = 0.0f;
     Lfo lfo1, lfo2;
     float lfo1Last = 0.0f, lfo2Last = 0.0f;
-    juce::dsp::StateVariableTPTFilter<float> filter;
+    VapeFilter filter;
     juce::SmoothedValue<float> cutoffSm, gainSm;
 
     float velocity = 0.0f, keytrack = 0.0f, pbSemis = 0.0f;
