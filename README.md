@@ -1,5 +1,7 @@
 # VapeStation
 
+<img width="1000" alt="Virtual instrument synthesizer, Vapestation" src="https://github.com/user-attachments/assets/ebefa4d9-c568-4128-ae23-d1fca1afc1c1" />
+
 **A free, cross-platform "graintable" synthesizer.** Wavetable morphing meets
 granular texture. Every knob on the panel can be modulated by dragging
 an envelope or LFO straight onto it.
