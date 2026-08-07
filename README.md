@@ -195,16 +195,6 @@ chrome --headless --screenshot=webapp/og.png --window-size=1280,674 \
 sips -z 630 1200 webapp/og.png
 ```
 
-## Reaktor port
-
-`docs/reaktor-port/build-guide.md` is a from-scratch construction guide for
-building VapeStation as a Native Instruments Reaktor 6 ensemble by hand (full
-Reaktor, not Player). `webapp/tools/export-reaktor-tables.mjs` renders the 5
-graintables to WAV files for the guide's Sample Map import step. It's a
-by-hand port, not an automated one — see the guide's "Known deviations"
-section for where Reaktor's stock Grain Cloud module can't fully match the
-original engine (frame-interpolated morphing, curved grain windows).
-
 ## Layout
 
 - `Source/Params.h` — parameter/destination definitions (single source of truth)
